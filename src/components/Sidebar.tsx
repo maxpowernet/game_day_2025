@@ -51,29 +51,19 @@ const Sidebar: React.FC = () => {
           <Users className="h-4 w-4" />
           Jogadores
         </Button>
-        <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/tasks')}>
-          <CheckSquare className="h-4 w-4" />
-          Tarefas
-          <Badge variant="secondary" className="ml-auto">0</Badge>
-        </Button>
+        {/* Tarefas removed */}
         <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/calendar')}>
           <Calendar className="h-4 w-4" />
           Calendário
         </Button>
-        <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/scoreboard')}>
-          <BarChart3 className="h-4 w-4" />
-          Classificação
-        </Button>
+        {/* Classificação removed */}
 
         <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3 mt-8">Geral</h3>
         <Button variant="ghost" className="w-full justify-start gap-3">
           <Settings className="h-4 w-4" />
           Configurações
         </Button>
-        <Button variant="ghost" className="w-full justify-start gap-3">
-          <HelpCircle className="h-4 w-4" />
-          Ajuda
-        </Button>
+        {/* Ajuda removed */}
         <Button variant="ghost" className="w-full justify-start gap-3">
           <LogOut className="h-4 w-4" />
           Sair

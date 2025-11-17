@@ -234,19 +234,11 @@ const Calendar = () => {
             <LayoutDashboard className="h-4 w-4" />
             Painel
           </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/tasks')}>
-            <CheckSquare className="h-4 w-4" />
-            Tarefas
-            <Badge variant="secondary" className="ml-auto">62</Badge>
-          </Button>
+          {/* Tarefas removed */}
           <Button variant="default" className="w-full justify-start gap-3">
             <CalendarIcon className="h-4 w-4" />
             Calendário
             <Badge variant="secondary" className="ml-auto">{events.length}</Badge>
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3">
-            <BarChart3 className="h-4 w-4" />
-            Análises
           </Button>
           <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/equipe')}>
             <Users className="h-4 w-4" />

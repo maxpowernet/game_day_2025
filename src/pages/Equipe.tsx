@@ -89,10 +89,7 @@ const Equipe = () => {
             <LayoutDashboard className='h-4 w-4' />
             Painel
           </Button>
-          <Button variant='ghost' className='w-full justify-start gap-3' onClick={() => navigate('/tasks')}>
-            <CheckSquare className='h-4 w-4' />
-            Tarefas
-          </Button>
+          {/* Tarefas removed */}
           <Button variant='ghost' className='w-full justify-start gap-3' onClick={() => navigate('/calendar')}>
             <Calendar className='h-4 w-4' />
             Calendário
