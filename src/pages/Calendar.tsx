@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import Sidebar from '@/components/Sidebar';
 
 interface Event {
   id: string;
@@ -219,58 +220,7 @@ const Calendar = () => {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="w-64 bg-card border-r border-border p-6 hidden md:block">
-        <div className="flex items-center gap-2 mb-8">
-          <div className="h-8 w-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-            <Joystick className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-xl font-bold">Game Day</span>
-        </div>
-
-        <nav className="space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Menu</h3>
-          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/game-day')}>
-            <LayoutDashboard className="h-4 w-4" />
-            Painel
-          </Button>
-          {/* Tarefas removed */}
-          <Button variant="default" className="w-full justify-start gap-3">
-            <CalendarIcon className="h-4 w-4" />
-            Calendário
-            <Badge variant="secondary" className="ml-auto">{events.length}</Badge>
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/equipe')}>
-            <Users className="h-4 w-4" />
-            Equipe
-          </Button>
-
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3 mt-8">Geral</h3>
-          <Button variant="ghost" className="w-full justify-start gap-3">
-            <Settings className="h-4 w-4" />
-            Configurações
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3">
-            <HelpCircle className="h-4 w-4" />
-            Ajuda
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3">
-            <LogOut className="h-4 w-4" />
-            Sair
-          </Button>
-        </nav>
-
-        <Card className="mt-8 p-4 bg-gradient-to-br from-primary to-accent text-white">
-          <div className="mb-3">
-            <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center mb-2">
-              <Play className="h-5 w-5" />
-            </div>
-          </div>
-          <h4 className="font-semibold mb-1">Baixe nosso App Mobile</h4>
-          <p className="text-xs text-white/80 mb-3">Obtenha agora em seu dispositivo</p>
-          <Button size="sm" variant="secondary" className="w-full">Baixar</Button>
-        </Card>
-      </aside>
+      <Sidebar />
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">

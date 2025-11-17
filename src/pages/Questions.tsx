@@ -37,10 +37,12 @@ import {
   Clock,
   Trophy,
 } from "lucide-react";
+import Sidebar from "@/components/Sidebar";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchQuestions,
+  fetchCampaigns,
   addQuestion as apiAddQuestion,
   updateQuestion as apiUpdateQuestion,
   deleteQuestion as apiDeleteQuestion,
@@ -55,12 +57,15 @@ const Questions = () => {
   const queryClient = useQueryClient();
 
   const { data: questions = [] } = useQuery({ queryKey: ["questions"], queryFn: fetchQuestions });
+  const { data: campaigns = [] } = useQuery({ queryKey: ["campaigns"], queryFn: fetchCampaigns });
 
+  const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "todo" | "in-progress" | "completed">("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
 
   const [form, setForm] = useState({
+    campaignId: 0,
     text: "",
     choice0: "",
     choice1: "",
@@ -71,7 +76,6 @@ const Questions = () => {
     pointsLate: 5,
     status: "todo" as "todo" | "in-progress" | "completed",
     priority: "medium" as "low" | "medium" | "high",
-    dayIndex: 0,
   });
 
   const addMutation = useMutation({
@@ -93,6 +97,7 @@ const Questions = () => {
     if (q) {
       setEditingQuestion(q);
       setForm({
+        campaignId: q.campaignId,
         text: q.text,
         choice0: q.choices[0] || "",
         choice1: q.choices[1] || "",
@@ -103,11 +108,11 @@ const Questions = () => {
         pointsLate: q.pointsLate ?? 5,
         status: q.status,
         priority: q.priority ?? "medium",
-        dayIndex: (q as any).dayIndex ?? 0,
       });
     } else {
       setEditingQuestion(null);
       setForm({
+        campaignId: selectedCampaignId || 0,
         text: "",
         choice0: "",
         choice1: "",
@@ -118,17 +123,26 @@ const Questions = () => {
         pointsLate: 5,
         status: "todo",
         priority: "medium",
-        dayIndex: 0,
       });
     }
     setIsDialogOpen(true);
   };
 
   const saveQuestion = () => {
+    if (!form.campaignId) return alert("Selecione uma campanha primeiro");
     if (!form.text || !form.choice0) return alert("Preencha enunciado e pelo menos uma alternativa");
 
     const choices = [form.choice0, form.choice1, form.choice2, form.choice3].filter(Boolean);
+    
+    // Auto-calculate dayIndex: count existing questions in this campaign
+    const existingQuestionsInCampaign = questions.filter((q: Question) => q.campaignId === form.campaignId);
+    const dayIndex = editingQuestion 
+      ? editingQuestion.dayIndex 
+      : existingQuestionsInCampaign.length; // next available day
+
     const payload = {
+      campaignId: form.campaignId,
+      dayIndex,
       text: form.text,
       choices,
       answer: Math.min(form.answer, choices.length - 1),
@@ -136,6 +150,8 @@ const Questions = () => {
       pointsLate: form.pointsLate,
       status: form.status,
       priority: form.priority,
+      scheduleTime: "08:00",
+      deadlineTime: "18:00",
     } as Omit<Question, "id">;
 
     if (editingQuestion) {
@@ -199,64 +215,22 @@ const Questions = () => {
     reader.readAsText(file);
   };
 
-  const filtered = questions.filter(q => filter === 'all' || q.status === filter);
+  const filtered = questions.filter(q => {
+    const matchesFilter = filter === 'all' || q.status === filter;
+    const matchesCampaign = !selectedCampaignId || q.campaignId === selectedCampaignId;
+    return matchesFilter && matchesCampaign;
+  });
 
   const stats = {
-    total: questions.length,
-    todo: questions.filter(q => q.status === 'todo').length,
-    inProgress: questions.filter(q => q.status === 'in-progress').length,
-    completed: questions.filter(q => q.status === 'completed').length,
+    total: selectedCampaignId ? questions.filter(q => q.campaignId === selectedCampaignId).length : questions.length,
+    todo: selectedCampaignId ? questions.filter(q => q.campaignId === selectedCampaignId && q.status === 'todo').length : questions.filter(q => q.status === 'todo').length,
+    inProgress: selectedCampaignId ? questions.filter(q => q.campaignId === selectedCampaignId && q.status === 'in-progress').length : questions.filter(q => q.status === 'in-progress').length,
+    completed: selectedCampaignId ? questions.filter(q => q.campaignId === selectedCampaignId && q.status === 'completed').length : questions.filter(q => q.status === 'completed').length,
   };
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="w-64 bg-card border-r border-border p-6 hidden md:block">
-        <div className="flex items-center gap-2 mb-8">
-          <div className="h-8 w-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-            <Joystick className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-xl font-bold">Game Day</span>
-        </div>
-        <nav className="space-y-2">
-          <h3 className='text-xs font-semibold text-muted-foreground uppercase mb-3'>Menu</h3>
-          <Button variant='ghost' className='w-full justify-start gap-3' onClick={() => navigate('/game-day')}>
-            <LayoutDashboard className='h-4 w-4' />
-            Painel
-          </Button>
-          <Button variant='ghost' className='w-full justify-start gap-3' onClick={() => navigate('/campaigns')}>
-            <CheckSquare className='h-4 w-4' />
-            Campanhas
-          </Button>
-          <Button variant='default' className='w-full justify-start gap-3'>
-            <CheckSquare className='h-4 w-4' />
-            Perguntas
-          </Button>
-          {/* Tarefas removed */}
-          <Button variant='ghost' className='w-full justify-start gap-3' onClick={() => navigate('/calendar')}>
-            <Calendar className='h-4 w-4' />
-            Calendário
-          </Button>
-          <Button variant='ghost' className='w-full justify-start gap-3' onClick={() => navigate('/players')}>
-            <Users className='h-4 w-4' />
-            Jogadores
-          </Button>
-          <h3 className='text-xs font-semibold text-muted-foreground uppercase mb-3 mt-8'>Geral</h3>
-          <Button variant='ghost' className='w-full justify-start gap-3'>
-            <Settings className='h-4 w-4' />
-            Configurações
-          </Button>
-        </nav>
-        <Card className='mt-8 p-4 bg-gradient-to-br from-primary to-accent text-white'>
-          <div className='mb-3'>
-            <div className='h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center mb-2'>
-              <Play className='h-5 w-5' />
-            </div>
-          </div>
-          <h4 className='font-semibold mb-1'>Baixe nosso App Mobile</h4>
-          <p className='text-xs text-white/80 mb-3'>Obtenha agora em seu dispositivo</p>
-          <Button size='sm' variant='secondary' className='w-full'>Baixar</Button>
-        </Card>
-      </aside>
+      <Sidebar />
 
       <main className='flex-1 overflow-auto'>
         <header className='bg-card border-b border-border p-4 md:p-6'>
@@ -284,10 +258,10 @@ const Questions = () => {
           <div className='flex items-center justify-between'>
             <div>
               <h1 className='text-3xl font-bold mb-1'>Perguntas</h1>
-              <p className='text-muted-foreground'>Crie e gerencie perguntas, defina pontuações e importe em lote.</p>
+              <p className='text-muted-foreground'>Selecione uma campanha e crie perguntas que serão distribuídas automaticamente por dia.</p>
             </div>
             <div className='flex gap-2'>
-              <Button onClick={() => openDialog()}>
+              <Button onClick={() => openDialog()} disabled={!selectedCampaignId}>
                 <Plus className='h-4 w-4 mr-2' />
                 Nova Pergunta
               </Button>
@@ -299,6 +273,32 @@ const Questions = () => {
               </Button>
             </div>
           </div>
+
+          <Card className='p-4 bg-muted/50'>
+            <div className='flex items-center gap-4'>
+              <Label className='text-sm font-medium'>Campanha Ativa:</Label>
+              <Select 
+                value={selectedCampaignId ? String(selectedCampaignId) : ''} 
+                onValueChange={(v: string) => setSelectedCampaignId(parseInt(v, 10))}
+              >
+                <SelectTrigger className='w-[300px]'>
+                  <SelectValue placeholder="Selecione uma campanha" />
+                </SelectTrigger>
+                <SelectContent>
+                  {campaigns.filter((c: any) => c.status === 'planned' || c.status === 'in-progress').map((c: any) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name} ({new Date(c.startDate).toLocaleDateString('pt-BR')} - {new Date(c.endDate).toLocaleDateString('pt-BR')})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedCampaignId && (
+                <Badge variant='secondary'>
+                  {questions.filter((q: Question) => q.campaignId === selectedCampaignId).length} perguntas cadastradas
+                </Badge>
+              )}
+            </div>
+          </Card>
 
           <div className='grid grid-cols-1 md:grid-cols-3 gap-6 mb-6'>
             <StatCard title='Total de Perguntas' value={String(stats.total)} icon={HelpCircle} variant='primary' />
@@ -323,10 +323,10 @@ const Questions = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead className='w-[300px]'>Enunciado</TableHead>
-                    <TableHead>Alternativas</TableHead>
+                    <TableHead>Campanha / Dia</TableHead>
+                    <TableHead>Horário</TableHead>
                     <TableHead>Pontuação</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Prioridade</TableHead>
                     <TableHead className='w-[120px] text-center'>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -334,67 +334,81 @@ const Questions = () => {
                   {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className='text-center text-muted-foreground py-8'>
-                        Nenhuma pergunta cadastrada. Clique em "Nova Pergunta" ou importe um arquivo.
+                        {selectedCampaignId 
+                          ? 'Nenhuma pergunta cadastrada para esta campanha.' 
+                          : 'Selecione uma campanha para ver as perguntas.'}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((question) => (
-                      <TableRow key={question.id}>
-                        <TableCell>
-                          <div className='flex items-start gap-3'>
-                            <div className='h-9 w-9 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0'>
-                              <HelpCircle className='h-5 w-5 text-primary' />
+                    filtered.map((question) => {
+                      const campaign = campaigns.find((c: any) => c.id === question.campaignId);
+                      const campaignStartDate = campaign ? new Date(campaign.startDate) : null;
+                      const questionDate = campaignStartDate ? new Date(campaignStartDate.getTime() + question.dayIndex * 24 * 60 * 60 * 1000) : null;
+                      
+                      return (
+                        <TableRow key={question.id}>
+                          <TableCell>
+                            <div className='flex items-start gap-3'>
+                              <div className='h-9 w-9 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0'>
+                                <HelpCircle className='h-5 w-5 text-primary' />
+                              </div>
+                              <span className='font-medium line-clamp-2'>{question.text}</span>
                             </div>
-                            <span className='font-medium line-clamp-2'>{question.text}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant='secondary'>{question.choices.length} opções</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className='text-sm'>
-                            <div className='flex items-center gap-1'>
-                              <Trophy className='h-3 w-3 text-green-600' />
-                              <span>{question.pointsOnTime} pts (no prazo)</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className='flex flex-col gap-1'>
+                              <Badge variant='outline' className='w-fit'>{campaign?.name || 'Campanha não encontrada'}</Badge>
+                              <span className='text-xs text-muted-foreground'>
+                                Dia {question.dayIndex + 1} {questionDate ? `(${questionDate.toLocaleDateString('pt-BR')})` : ''}
+                              </span>
                             </div>
-                            <div className='flex items-center gap-1 text-muted-foreground'>
-                              <Trophy className='h-3 w-3' />
-                              <span>{question.pointsLate} pts (atrasado)</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className='flex items-center gap-1 text-sm'>
+                              <Clock className='h-3 w-3 text-muted-foreground' />
+                              <span>{question.scheduleTime || '08:00'} - {question.deadlineTime || '18:00'}</span>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={question.status === 'completed' ? 'default' : question.status === 'in-progress' ? 'secondary' : 'outline'}>
-                            {question.status === 'todo' ? 'A Fazer' : question.status === 'in-progress' ? 'Em Andamento' : 'Concluída'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={question.priority === 'high' ? 'destructive' : question.priority === 'low' ? 'secondary' : 'outline'}>
-                            {question.priority === 'high' ? 'Alta' : question.priority === 'low' ? 'Baixa' : 'Média'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className='text-center'>
-                          <div className='flex items-center justify-center gap-2'>
-                            <Button
-                              variant='ghost'
-                              size='icon'
-                              className='h-8 w-8'
-                              onClick={() => openDialog(question)}
-                            >
-                              <Edit className='h-4 w-4' />
-                            </Button>
-                            <Button
-                              variant='ghost'
-                              size='icon'
-                              className='h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10'
-                              onClick={() => removeQuestion(question.id)}
-                            >
-                              <Trash2 className='h-4 w-4' />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                          </TableCell>
+                          <TableCell>
+                            <div className='text-sm'>
+                              <div className='flex items-center gap-1'>
+                                <Trophy className='h-3 w-3 text-green-600' />
+                                <span>{question.pointsOnTime} pts (no prazo)</span>
+                              </div>
+                              <div className='flex items-center gap-1 text-muted-foreground'>
+                                <Trophy className='h-3 w-3' />
+                                <span>{question.pointsLate} pts (atrasado)</span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={question.status === 'completed' ? 'default' : question.status === 'in-progress' ? 'secondary' : 'outline'}>
+                              {question.status === 'todo' ? 'A Fazer' : question.status === 'in-progress' ? 'Em Andamento' : 'Concluída'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className='text-center'>
+                            <div className='flex items-center justify-center gap-2'>
+                              <Button
+                                variant='ghost'
+                                size='icon'
+                                className='h-8 w-8'
+                                onClick={() => openDialog(question)}
+                              >
+                                <Edit className='h-4 w-4' />
+                              </Button>
+                              <Button
+                                variant='ghost'
+                                size='icon'
+                                className='h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10'
+                                onClick={() => removeQuestion(question.id)}
+                              >
+                                <Trash2 className='h-4 w-4' />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -409,6 +423,30 @@ const Questions = () => {
             <DialogTitle>{editingQuestion ? 'Editar Pergunta' : 'Nova Pergunta'}</DialogTitle>
           </DialogHeader>
           <div className='space-y-4 py-4'>
+            <div className='space-y-2'>
+              <Label>Campanha *</Label>
+              <Select 
+                value={String(form.campaignId)} 
+                onValueChange={(v: string) => setForm({ ...form, campaignId: parseInt(v, 10) })}
+                disabled={!!editingQuestion}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma campanha" />
+                </SelectTrigger>
+                <SelectContent>
+                  {campaigns.filter((c: any) => c.status === 'planned' || c.status === 'in-progress').map((c: any) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name} ({new Date(c.startDate).toLocaleDateString('pt-BR')} - {new Date(c.endDate).toLocaleDateString('pt-BR')})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.campaignId > 0 && !editingQuestion && (
+                <p className='text-xs text-muted-foreground'>
+                  Esta pergunta será automaticamente atribuída ao Dia {questions.filter((q: Question) => q.campaignId === form.campaignId).length + 1} (08h-18h)
+                </p>
+              )}
+            </div>
             <div className='space-y-2'>
               <Label>Enunciado</Label>
               <Textarea
@@ -434,15 +472,6 @@ const Questions = () => {
                   max={3}
                   value={form.answer}
                   onChange={(e) => setForm({ ...form, answer: parseInt(e.target.value, 10) || 0 })}
-                />
-              </div>
-              <div className='space-y-2'>
-                <Label>Dia da Campanha</Label>
-                <Input
-                  type='number'
-                  min={0}
-                  value={form.dayIndex}
-                  onChange={(e) => setForm({ ...form, dayIndex: parseInt(e.target.value, 10) || 0 })}
                 />
               </div>
             </div>

@@ -4,39 +4,57 @@ export interface Player {
   role?: string;
   task?: string;
   status?: string;
-  score: number;
+  score: number; // total across all campaigns
   teamId?: number;
+  campaignScores?: { [campaignId: number]: number }; // points per campaign
 }
 
 export interface Team {
   id: number;
+  campaignId: number; // team belongs to a specific campaign
   name: string;
   members: number[]; // player IDs
+  totalScore?: number; // calculated sum of member scores in this campaign
   createdAt: string;
 }
 
 export interface Campaign {
   id: number;
   name: string;
-  status: 'todo' | 'in-progress' | 'completed';
-  startDate: string;
-  endDate: string;
+  status: 'planned' | 'in-progress' | 'completed';
+  startDate: string; // ISO date
+  endDate: string; // ISO date
   icon?: string;
-  questionIds: number[]; // associated questions
-  teamIds: number[]; // associated teams
+  playerIds: number[]; // players enrolled in this campaign
+  questionIds?: number[]; // associated questions (optional, can be derived)
+  teamIds?: number[]; // associated teams (optional, can be derived)
   createdAt: string;
 }
 
 export interface Question {
   id: number;
+  campaignId: number; // question belongs to a campaign (required)
+  dayIndex: number; // which day of campaign (0-based, auto-assigned)
   text: string;
   choices: string[];
   answer: number;
   status: 'todo' | 'in-progress' | 'completed';
   priority?: 'low' | 'medium' | 'high';
-  pointsOnTime: number; // points if answered on time
+  pointsOnTime: number; // points if answered on time (08h-18h)
   pointsLate: number; // points if answered late
-  dayIndex?: number; // which day of campaign (0-based)
+  scheduleTime?: string; // "08:00" opening time (Brasilia)
+  deadlineTime?: string; // "18:00" closing time (Brasilia)
+}
+
+export interface Answer {
+  id: number;
+  playerId: number;
+  questionId: number;
+  campaignId: number;
+  answeredAt: string; // ISO timestamp
+  selectedAnswer: number;
+  pointsEarned: number; // calculated based on time
+  isOnTime: boolean; // true if answered within schedule
 }
 
 function read<T>(key: string, fallback: T): T {
@@ -186,6 +204,99 @@ export async function deleteCampaign(id: number): Promise<void> {
   const list = read<Campaign[]>('gd_campaigns', []);
   const next = list.filter(c => c.id !== id);
   write('gd_campaigns', next);
+  return Promise.resolve();
+}
+
+// Answers
+export async function fetchAnswers(): Promise<Answer[]> {
+  return Promise.resolve(read<Answer[]>('gd_answers', []));
+}
+
+export async function addAnswer(a: Omit<Answer, 'id'>): Promise<Answer> {
+  const list = read<Answer[]>('gd_answers', []);
+  const id = Math.max(0, ...list.map(x => x.id)) + 1;
+  const next: Answer = { id, ...a } as Answer;
+  list.push(next);
+  write('gd_answers', list);
+  return Promise.resolve(next);
+}
+
+export async function getPlayerAnswersForCampaign(playerId: number, campaignId: number): Promise<Answer[]> {
+  const all = read<Answer[]>('gd_answers', []);
+  return Promise.resolve(all.filter(a => a.playerId === playerId && a.campaignId === campaignId));
+}
+
+// Admins
+export interface Admin {
+  id: number;
+  name: string;
+  email: string;
+  invited?: boolean; // true when invitation sent but not yet activated
+  inviteToken?: string; // token used in invite acceptance link
+  createdAt: string;
+}
+
+export async function fetchAdmins(): Promise<Admin[]> {
+  return Promise.resolve(read<Admin[]>('gd_admins', []));
+}
+
+export async function addAdmin(a: Omit<Admin, 'id' | 'createdAt'>): Promise<Admin> {
+  const list = read<Admin[]>('gd_admins', []);
+  const id = Math.max(0, ...list.map(x => x.id)) + 1;
+  const next: Admin = { id, ...a, createdAt: new Date().toISOString() } as Admin;
+  list.push(next);
+  write('gd_admins', list);
+  return Promise.resolve(next);
+}
+
+export async function updateAdmin(updated: Admin): Promise<Admin> {
+  const list = read<Admin[]>('gd_admins', []);
+  const next = list.map(a => a.id === updated.id ? updated : a);
+  write('gd_admins', next);
+  return Promise.resolve(updated);
+}
+
+export async function deleteAdmin(id: number): Promise<void> {
+  const list = read<Admin[]>('gd_admins', []);
+  const next = list.filter(a => a.id !== id);
+  write('gd_admins', next);
+  return Promise.resolve();
+}
+
+// Messages (reports from players / other platforms)
+export interface MessageItem {
+  id: number;
+  from: string; // player email or source
+  subject: string;
+  body: string;
+  receivedAt: string;
+  handled?: boolean;
+}
+
+export async function fetchMessages(): Promise<MessageItem[]> {
+  return Promise.resolve(read<MessageItem[]>('gd_messages', []));
+}
+
+export async function addMessage(m: Omit<MessageItem, 'id' | 'receivedAt'>): Promise<MessageItem> {
+  const list = read<MessageItem[]>('gd_messages', []);
+  const id = Math.max(0, ...list.map(x => x.id)) + 1;
+  const next: MessageItem = { id, ...m, receivedAt: new Date().toISOString() } as MessageItem;
+  list.push(next);
+  write('gd_messages', list);
+  return Promise.resolve(next);
+}
+
+export async function updateMessage(updated: MessageItem): Promise<MessageItem> {
+  const list = read<MessageItem[]>('gd_messages', []);
+  const next = list.map(m => m.id === updated.id ? updated : m);
+  write('gd_messages', next);
+  return Promise.resolve(updated);
+}
+
+export async function deleteMessage(id: number): Promise<void> {
+  const list = read<MessageItem[]>('gd_messages', []);
+  const next = list.filter(m => m.id !== id);
+  write('gd_messages', next);
   return Promise.resolve();
 }
 

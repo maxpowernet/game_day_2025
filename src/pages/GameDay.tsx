@@ -73,6 +73,15 @@ const GameDay = () => {
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon">🔔</Button>
               <Button onClick={() => navigate('/campaigns')}>Ver Campanhas</Button>
+              <div className='flex items-center gap-3'>
+                <Avatar>
+                  <AvatarFallback className='bg-primary text-white'>GM</AvatarFallback>
+                </Avatar>
+                <div className='hidden md:block'>
+                  <p className='text-sm font-semibold'>Game Master</p>
+                  <p className='text-xs text-muted-foreground'>gm@game-day.io</p>
+                </div>
+              </div>
             </div>
           </div>
         </header>

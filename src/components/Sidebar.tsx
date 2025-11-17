@@ -59,7 +59,7 @@ const Sidebar: React.FC = () => {
         {/* Classificação removed */}
 
         <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3 mt-8">Geral</h3>
-        <Button variant="ghost" className="w-full justify-start gap-3">
+        <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/settings')}>
           <Settings className="h-4 w-4" />
           Configurações
         </Button>
