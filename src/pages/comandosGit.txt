@@ -1,0 +1,17 @@
+BAIXAR DO SITE A ATUALIZAÇÃO:
+
+git fetch origin
+git checkout main
+git pull origin main
+
+UPAR DO COMPUTADOR PARA O SITE:
+
+git status
+git add -A
+git commit -m "Ativa navegação Equipe e remove botão Adicionar na página Equipe"
+git push origin main
+
+    VERIFICAR O COMMIT / PUSH
+    git log -1
+    git show 9bd85c9
+    git remote -v
