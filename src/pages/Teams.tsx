@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { StatCard } from '@/components/ui/stat-card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import UserProfile from '@/components/UserProfile';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -86,7 +87,7 @@ const Teams = () => {
           <div className='flex items-center justify-between'>
             <div className='flex-1 max-w-md'><div className='relative'><input type='search' placeholder='Buscar equipe' className='w-full px-4 py-2 pl-10 bg-background border border-border rounded-lg' /></div></div>
             <div className='flex items-center gap-4'>
-              <div className='flex items-center gap-3'><Avatar><AvatarFallback className='bg-primary text-white'>GM</AvatarFallback></Avatar><div className='hidden md:block'><p className='text-sm font-semibold'>Game Master</p><p className='text-xs text-muted-foreground'>gm@game-day.io</p></div></div>
+              <UserProfile />
             </div>
           </div>
         </header>

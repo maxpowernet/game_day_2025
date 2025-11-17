@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import UserProfile from '@/components/UserProfile';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchAdmins, addAdmin, updateAdmin, fetchMessages, updateMessage, deleteMessage, Admin, MessageItem } from '@/lib/storageApi';
 
@@ -25,17 +25,7 @@ const Settings = () => {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
 
-  // Theme handling
-  const [dark, setDark] = useState<boolean>(() => {
-    try { return localStorage.getItem('gd_theme') === 'dark'; } catch { return false; }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('gd_theme', dark ? 'dark' : 'light');
-      if (dark) document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark');
-    } catch (e) { /* ignore */ }
-  }, [dark]);
+  // Theme handled by UserProfile component
 
   const generateToken = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 
@@ -73,15 +63,7 @@ const Settings = () => {
               <h1 className='text-2xl font-bold'>Configurações</h1>
               <p className='text-muted-foreground'>Configurações da plataforma</p>
             </div>
-            <div className='flex items-center gap-3'>
-              <Avatar>
-                <AvatarFallback className='bg-primary text-white'>GM</AvatarFallback>
-              </Avatar>
-              <div className='hidden md:block'>
-                <p className='text-sm font-semibold'>Game Master</p>
-                <p className='text-xs text-muted-foreground'>gm@game-day.io</p>
-              </div>
-            </div>
+            <UserProfile />
           </div>
         </header>
 
@@ -140,17 +122,7 @@ const Settings = () => {
               </div>
             </Card>
 
-            <Card className='p-6'>
-              <h3 className='text-lg font-semibold mb-2'>Aparência</h3>
-              <p className='text-sm text-muted-foreground mb-4'>Modo claro / modo escuro para todas as telas.</p>
-              <div className='flex items-center justify-between'>
-                <div>
-                  <div className='font-medium'>Modo Escuro</div>
-                  <div className='text-xs text-muted-foreground'>Ativa o tema escuro na interface</div>
-                </div>
-                <Switch checked={dark} onCheckedChange={(v:any) => setDark(Boolean(v))} />
-              </div>
-            </Card>
+            
 
             <Card className='p-6 col-span-1 lg:col-span-3'>
               <h3 className='text-lg font-semibold mb-2'>Caixa de Mensagens</h3>

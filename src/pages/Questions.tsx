@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import UserProfile from '@/components/UserProfile';
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -243,13 +244,7 @@ const Questions = () => {
             <div className='flex items-center gap-4'>
               <Button variant='ghost' size='icon'><Mail className='h-5 w-5' /></Button>
               <Button variant='ghost' size='icon'><Bell className='h-5 w-5' /></Button>
-              <div className='flex items-center gap-3'>
-                <Avatar><AvatarFallback className='bg-primary text-white'>GM</AvatarFallback></Avatar>
-                <div className='hidden md:block'>
-                  <p className='text-sm font-semibold'>Game Master</p>
-                  <p className='text-xs text-muted-foreground'>gm@game-day.io</p>
-                </div>
-              </div>
+              <UserProfile />
             </div>
           </div>
         </header>

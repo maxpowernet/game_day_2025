@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import UserProfile from '@/components/UserProfile';
 import { Badge } from "@/components/ui/badge";
 import { 
   Play,
@@ -71,17 +72,7 @@ const GameDay = () => {
               <p className="text-muted-foreground">Visão geral do Game Day</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon">🔔</Button>
-              <Button onClick={() => navigate('/campaigns')}>Ver Campanhas</Button>
-              <div className='flex items-center gap-3'>
-                <Avatar>
-                  <AvatarFallback className='bg-primary text-white'>GM</AvatarFallback>
-                </Avatar>
-                <div className='hidden md:block'>
-                  <p className='text-sm font-semibold'>Game Master</p>
-                  <p className='text-xs text-muted-foreground'>gm@game-day.io</p>
-                </div>
-              </div>
+              <UserProfile />
             </div>
           </div>
         </header>
