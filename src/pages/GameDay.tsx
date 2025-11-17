@@ -7,113 +7,14 @@ import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Play, CheckSquare, TrendingUp, ArrowUpRight, Plus } from "lucide-react";
-import Sidebar from "@/components/Sidebar";
-
-const GameDay = () => {
-  const navigate = useNavigate();
-  const [activeTimer, setActiveTimer] = useState(false);
-
-  const { data: campaigns = [] } = useQuery({ queryKey: ["campaigns"], queryFn: fetchCampaigns });
-  const { data: questions = [] } = useQuery({ queryKey: ["questions"], queryFn: fetchQuestions });
-  const { data: players = [] } = useQuery({ queryKey: ["players"], queryFn: fetchPlayers });
-  const { data: teams = [] } = useQuery({ queryKey: ["teams"], queryFn: fetchTeams });
-
-  const stats = {
-    activeCampaigns: campaigns.filter((c: any) => c.status === "in-progress").length,
-    pendingQuestions: questions.filter((q: any) => q.status === "todo").length,
-    totalPlayers: players.length,
-    totalTeams: teams.length,
-  };
-
-  return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-
-      <main className="flex-1 overflow-auto">
-        <header className="bg-card border-b border-border p-4 md:p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Painel</h1>
-              <p className="text-muted-foreground">Visão geral do Game Day</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon">🔔</Button>
-              <Button onClick={() => navigate('/campaigns')}>Ver Campanhas</Button>
-            </div>
-          </div>
-        </header>
-
-        <div className="p-4 md:p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <StatCard title="Campanhas Ativas" value={String(stats.activeCampaigns)} icon={TrendingUp} variant="primary" />
-            <StatCard title="Perguntas Pendentes" value={String(stats.pendingQuestions)} icon={CheckSquare} />
-            <StatCard title="Jogadores" value={String(stats.totalPlayers)} icon={Play} />
-            <StatCard title="Equipes" value={String(stats.totalTeams)} icon={ArrowUpRight} />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 p-6">
-              <h3 className="text-lg font-semibold mb-4">Atividades Recentes</h3>
-              <p className="text-sm text-muted-foreground">Resumo rápido das últimas campanhas e perguntas.</p>
-            </Card>
-
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Equipe</h3>
-                <Button variant="outline" size="sm"><Plus className="h-4 w-4" /> Adicionar</Button>
-              </div>
-              <div className="space-y-3">
-                {players.slice(0, 5).map((p: any) => (
-                  <div key={p.id} className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarFallback className="bg-primary text-white">{(p.name || '').split(' ').map((n: string) => n[0]).join('')}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{p.role || 'Jogador'}</p>
-                    </div>
-                    <Badge variant="secondary">{p.score ?? 0} pts</Badge>
-                  </div>
-                ))}
-                {players.length === 0 && <p className="text-sm text-muted-foreground">Nenhum jogador cadastrado</p>}
-              </div>
-            </Card>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-};
-
-export default GameDay;
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { fetchCampaigns, fetchQuestions, fetchPlayers, fetchTeams } from "@/lib/storageApi";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { StatCard } from "@/components/ui/stat-card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { 
-  LayoutDashboard, 
-  Joystick,
-  CheckSquare, 
-  Calendar, 
-  BarChart3, 
-  Users, 
-  Settings, 
-  HelpCircle, 
-  LogOut,
+  Play,
+  Pause,
+  Square,
   Plus,
   TrendingUp,
   ArrowUpRight,
-  Mail,
-  Bell,
-  Play,
-  Pause,
-  Square
+  CheckSquare
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 
@@ -160,77 +61,23 @@ const GameDay = () => {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="w-64 bg-card border-r border-border p-6 hidden md:block">
-        <div className="flex items-center gap-2 mb-8">
-            <div className="h-8 w-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-            <Joystick className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-xl font-bold">Game Day</span>
-        </div>
+      <Sidebar />
 
-        <nav className="space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Menu</h3>
-          <Button variant="default" className="w-full justify-start gap-3">
-            <Joystick className="h-4 w-4" />
-            Painel
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/campaigns')}>
-            <TrendingUp className="h-4 w-4" />
-            Campanhas
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/questions')}>
-            <HelpCircle className="h-4 w-4" />
-            Perguntas
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/teams')}>
-            <Users className="h-4 w-4" />
-            Equipes
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/players')}>
-            <Users className="h-4 w-4" />
-            Jogadores
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/tasks')}>
-            <CheckSquare className="h-4 w-4" />
-            Tarefas
-            <Badge variant="secondary" className="ml-auto">62</Badge>
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/calendar')}>
-            <Calendar className="h-4 w-4" />
-            Calendário
-            <Badge variant="secondary" className="ml-auto">0</Badge>
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3">
-            <BarChart3 className="h-4 w-4" />
-            Análises
-          </Button>
-
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3 mt-8">Geral</h3>
-          <Button variant="ghost" className="w-full justify-start gap-3">
-            <Settings className="h-4 w-4" />
-            Configurações
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3">
-            <HelpCircle className="h-4 w-4" />
-            Ajuda
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3">
-            <LogOut className="h-4 w-4" />
-            Sair
-          </Button>
-        </nav>
-
-        <Card className="mt-8 p-4 bg-gradient-to-br from-primary to-accent text-white">
-          <div className="mb-3">
-            <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center mb-2">
-              <Play className="h-5 w-5" />
+      <main className="flex-1 overflow-auto">
+        <header className="bg-card border-b border-border p-4 md:p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Painel</h1>
+              <p className="text-muted-foreground">Visão geral do Game Day</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon">🔔</Button>
+              <Button onClick={() => navigate('/campaigns')}>Ver Campanhas</Button>
             </div>
           </div>
-          <h4 className="font-semibold mb-1">Baixe nosso App Mobile</h4>
-          <p className="text-xs text-white/80 mb-3">Obtenha agora em seu dispositivo</p>
-          <Button size="sm" variant="secondary" className="w-full">Baixar</Button>
+        </header>
 
+        <div className="p-4 md:p-6 space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard

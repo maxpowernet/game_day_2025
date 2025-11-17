@@ -134,7 +134,7 @@ const Teams = () => {
       try {
         const data = JSON.parse(String(reader.result));
         await apiSetTeams(data);
-        queryClient.invalidateQueries(['teams']);
+        queryClient.invalidateQueries({ queryKey: ['teams'] });
       } catch (e) {
         alert('Arquivo inválido');
       }
