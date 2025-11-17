@@ -7,6 +7,95 @@ import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Play, CheckSquare, TrendingUp, ArrowUpRight, Plus } from "lucide-react";
+import Sidebar from "@/components/Sidebar";
+
+const GameDay = () => {
+  const navigate = useNavigate();
+  const [activeTimer, setActiveTimer] = useState(false);
+
+  const { data: campaigns = [] } = useQuery({ queryKey: ["campaigns"], queryFn: fetchCampaigns });
+  const { data: questions = [] } = useQuery({ queryKey: ["questions"], queryFn: fetchQuestions });
+  const { data: players = [] } = useQuery({ queryKey: ["players"], queryFn: fetchPlayers });
+  const { data: teams = [] } = useQuery({ queryKey: ["teams"], queryFn: fetchTeams });
+
+  const stats = {
+    activeCampaigns: campaigns.filter((c: any) => c.status === "in-progress").length,
+    pendingQuestions: questions.filter((q: any) => q.status === "todo").length,
+    totalPlayers: players.length,
+    totalTeams: teams.length,
+  };
+
+  return (
+    <div className="flex min-h-screen bg-background">
+      <Sidebar />
+
+      <main className="flex-1 overflow-auto">
+        <header className="bg-card border-b border-border p-4 md:p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Painel</h1>
+              <p className="text-muted-foreground">Visão geral do Game Day</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon">🔔</Button>
+              <Button onClick={() => navigate('/campaigns')}>Ver Campanhas</Button>
+            </div>
+          </div>
+        </header>
+
+        <div className="p-4 md:p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <StatCard title="Campanhas Ativas" value={String(stats.activeCampaigns)} icon={TrendingUp} variant="primary" />
+            <StatCard title="Perguntas Pendentes" value={String(stats.pendingQuestions)} icon={CheckSquare} />
+            <StatCard title="Jogadores" value={String(stats.totalPlayers)} icon={Play} />
+            <StatCard title="Equipes" value={String(stats.totalTeams)} icon={ArrowUpRight} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-2 p-6">
+              <h3 className="text-lg font-semibold mb-4">Atividades Recentes</h3>
+              <p className="text-sm text-muted-foreground">Resumo rápido das últimas campanhas e perguntas.</p>
+            </Card>
+
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Equipe</h3>
+                <Button variant="outline" size="sm"><Plus className="h-4 w-4" /> Adicionar</Button>
+              </div>
+              <div className="space-y-3">
+                {players.slice(0, 5).map((p: any) => (
+                  <div key={p.id} className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarFallback className="bg-primary text-white">{(p.name || '').split(' ').map((n: string) => n[0]).join('')}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">{p.role || 'Jogador'}</p>
+                    </div>
+                    <Badge variant="secondary">{p.score ?? 0} pts</Badge>
+                  </div>
+                ))}
+                {players.length === 0 && <p className="text-sm text-muted-foreground">Nenhum jogador cadastrado</p>}
+              </div>
+            </Card>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default GameDay;
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { fetchCampaigns, fetchQuestions, fetchPlayers, fetchTeams } from "@/lib/storageApi";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { 
   LayoutDashboard, 
   Joystick,
