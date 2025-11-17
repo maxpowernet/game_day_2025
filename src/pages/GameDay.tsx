@@ -133,13 +133,14 @@ const GameDay = () => {
         </nav>
 
         <Card className="mt-8 p-4 bg-gradient-to-br from-primary to-accent text-white">
-          {/* Sidebar */}
-          <Sidebar />
-                Adicionar Projeto
-              </Button>
-              <Button variant="outline">Importar Dados</Button>
+          <div className="mb-3">
+            <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center mb-2">
+              <Play className="h-5 w-5" />
             </div>
           </div>
+          <h4 className="font-semibold mb-1">Baixe nosso App Mobile</h4>
+          <p className="text-xs text-white/80 mb-3">Obtenha agora em seu dispositivo</p>
+          <Button size="sm" variant="secondary" className="w-full">Baixar</Button>
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
