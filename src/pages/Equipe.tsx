@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table';
 import {
   LayoutDashboard,
+  Joystick,
   CheckSquare,
   Calendar,
   BarChart3,
@@ -76,9 +77,9 @@ const Equipe = () => {
   return (
     <div className='flex min-h-screen bg-background'>
       <aside className='w-64 bg-card border-r border-border p-6 hidden md:block'>
-        <div className='flex items-center gap-2 mb-8'>
+          <div className='flex items-center gap-2 mb-8'>
           <div className='h-8 w-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center'>
-            <LayoutDashboard className='h-5 w-5 text-white' />
+            <Joystick className='h-5 w-5 text-white' />
           </div>
           <span className='text-xl font-bold'>Game Day</span>
         </div>
@@ -98,7 +99,7 @@ const Equipe = () => {
           </Button>
           <Button variant='default' className='w-full justify-start gap-3'>
             <Users className='h-4 w-4' />
-            Equipe
+            Players
           </Button>
           <h3 className='text-xs font-semibold text-muted-foreground uppercase mb-3 mt-8'>Geral</h3>
           <Button variant='ghost' className='w-full justify-start gap-3'>
@@ -142,13 +143,13 @@ const Equipe = () => {
         <div className='p-4 md:p-6 space-y-6'>
           <div className='flex items-center justify-between'>
             <div>
-              <h1 className='text-3xl font-bold mb-1'>Equipe</h1>
-              <p className='text-muted-foreground'>Gerencie seus membros e responsabilidades</p>
+              <h1 className='text-3xl font-bold mb-1'>Players</h1>
+              <p className='text-muted-foreground'>Gerencie seus jogadores e pontuações</p>
             </div>
             <div className='flex gap-2'>
               <Button onClick={() => setIsNewMemberOpen(true)}>
                 <UserPlus className='h-4 w-4 mr-2' />
-                Novo Membro
+                Novo Jogador
               </Button>
             </div>
           </div>
@@ -160,7 +161,7 @@ const Equipe = () => {
 
           <Card className='p-6'>
             <div className='flex items-center justify-between mb-6'>
-              <h3 className='text-lg font-semibold'>Membros da Equipe</h3>
+              <h3 className='text-lg font-semibold'>Jogadores</h3>
             </div>
             <div className='rounded-md border'>
               <Table>

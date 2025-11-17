@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   LayoutDashboard,
+  Joystick,
   CheckSquare,
   Calendar,
   BarChart3,
@@ -195,7 +196,7 @@ const Tasks = () => {
       <aside className="w-64 bg-card border-r border-border p-6 hidden md:block">
         <div className="flex items-center gap-2 mb-8">
           <div className="h-8 w-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-            <LayoutDashboard className="h-5 w-5 text-white" />
+            <Joystick className="h-5 w-5 text-white" />
           </div>
           <span className="text-xl font-bold">Game Day</span>
         </div>
@@ -203,7 +204,7 @@ const Tasks = () => {
         <nav className="space-y-2">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Menu</h3>
           <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/game-day')}>
-            <LayoutDashboard className="h-4 w-4" />
+            <Joystick className="h-4 w-4" />
             Painel
           </Button>
             <Button variant="default" className="w-full justify-start gap-3">

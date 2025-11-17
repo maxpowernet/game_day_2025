@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { fetchCampaigns, fetchQuestions, fetchPlayers, fetchTeams } from "@/lib/storageApi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -7,6 +9,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { 
   LayoutDashboard, 
+  Joystick,
   CheckSquare, 
   Calendar, 
   BarChart3, 
@@ -23,11 +26,24 @@ import {
   Pause,
   Square
 } from "lucide-react";
+import Sidebar from "@/components/Sidebar";
 
 const GameDay = () => {
   const navigate = useNavigate();
   const [activeTimer, setActiveTimer] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(5048);
+
+  const { data: campaigns = [] } = useQuery({ queryKey: ['campaigns'], queryFn: fetchCampaigns });
+  const { data: questions = [] } = useQuery({ queryKey: ['questions'], queryFn: fetchQuestions });
+  const { data: players = [] } = useQuery({ queryKey: ['players'], queryFn: fetchPlayers });
+  const { data: teams = [] } = useQuery({ queryKey: ['teams'], queryFn: fetchTeams });
+
+  const stats = {
+    activeCampaigns: campaigns.filter((c: any) => c.status === 'in-progress').length,
+    pendingQuestions: questions.filter((q: any) => q.status === 'todo').length,
+    totalPlayers: players.length,
+    totalTeams: teams.length,
+  };
 
   const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
@@ -58,8 +74,8 @@ const GameDay = () => {
       {/* Sidebar */}
       <aside className="w-64 bg-card border-r border-border p-6 hidden md:block">
         <div className="flex items-center gap-2 mb-8">
-          <div className="h-8 w-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-            <LayoutDashboard className="h-5 w-5 text-white" />
+            <div className="h-8 w-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
+            <Joystick className="h-5 w-5 text-white" />
           </div>
           <span className="text-xl font-bold">Game Day</span>
         </div>
@@ -67,8 +83,24 @@ const GameDay = () => {
         <nav className="space-y-2">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3">Menu</h3>
           <Button variant="default" className="w-full justify-start gap-3">
-            <LayoutDashboard className="h-4 w-4" />
+            <Joystick className="h-4 w-4" />
             Painel
+          </Button>
+          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/campaigns')}>
+            <TrendingUp className="h-4 w-4" />
+            Campanhas
+          </Button>
+          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/questions')}>
+            <HelpCircle className="h-4 w-4" />
+            Perguntas
+          </Button>
+          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/teams')}>
+            <Users className="h-4 w-4" />
+            Equipes
+          </Button>
+          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/players')}>
+            <Users className="h-4 w-4" />
+            Jogadores
           </Button>
           <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/tasks')}>
             <CheckSquare className="h-4 w-4" />
@@ -83,10 +115,6 @@ const GameDay = () => {
           <Button variant="ghost" className="w-full justify-start gap-3">
             <BarChart3 className="h-4 w-4" />
             Análises
-          </Button>
-          <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/equipe')}>
-            <Users className="h-4 w-4" />
-            Equipe
           </Button>
 
           <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-3 mt-8">Geral</h3>
@@ -105,66 +133,8 @@ const GameDay = () => {
         </nav>
 
         <Card className="mt-8 p-4 bg-gradient-to-br from-primary to-accent text-white">
-          <div className="mb-3">
-            <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center mb-2">
-              <Play className="h-5 w-5" />
-            </div>
-          </div>
-          <h4 className="font-semibold mb-1">Baixe nosso App Mobile</h4>
-          <p className="text-xs text-white/80 mb-3">Obtenha agora em seu dispositivo</p>
-          <Button size="sm" variant="secondary" className="w-full">Baixar</Button>
-        </Card>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        {/* Header */}
-        <header className="bg-card border-b border-border p-4 md:p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <input
-                  type="search"
-                  placeholder="Buscar tarefa"
-                  className="w-full px-4 py-2 pl-10 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">🎮</span>
-                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-1 text-xs bg-muted rounded">
-                  ⌘ F
-                </kbd>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon">
-                <Mail className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="icon">
-                <Bell className="h-5 w-5" />
-              </Button>
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback className="bg-primary text-white">TM</AvatarFallback>
-                </Avatar>
-                <div className="hidden md:block">
-                  <p className="text-sm font-semibold">Totok Michael</p>
-                  <p className="text-xs text-muted-foreground">tmichael20@mail.com</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Game Day Content */}
-        <div className="p-4 md:p-6 space-y-6">
-          {/* Title and Actions */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold mb-1">Painel</h1>
-              <p className="text-muted-foreground">Planeje, priorize e realize suas tarefas com facilidade.</p>
-            </div>
-            <div className="flex gap-2">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
+          {/* Sidebar */}
+          <Sidebar />
                 Adicionar Projeto
               </Button>
               <Button variant="outline">Importar Dados</Button>
@@ -174,31 +144,31 @@ const GameDay = () => {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              title="Total de Projetos"
-              value="24"
-              change="Aumento em relação ao mês passado"
+              title="Campanhas Ativas"
+              value={stats.activeCampaigns.toString()}
+              change="Em progresso"
               changeType="increase"
               icon={TrendingUp}
               variant="primary"
             />
             <StatCard
-              title="Projetos Finalizados"
-              value="10"
-              change="Aumento em relação ao mês passado"
+              title="Perguntas Pendentes"
+              value={stats.pendingQuestions.toString()}
+              change="A fazer"
               changeType="increase"
               icon={CheckSquare}
             />
             <StatCard
-              title="Projetos em Andamento"
-              value="12"
-              change="Aumento em relação ao mês passado"
+              title="Total de Jogadores"
+              value={stats.totalPlayers.toString()}
+              change="Cadastrados"
               changeType="increase"
               icon={Play}
             />
             <StatCard
-              title="Projetos Pendentes"
-              value="2"
-              change="Em Discussão"
+              title="Total de Equipes"
+              value={stats.totalTeams.toString()}
+              change="Formadas"
               icon={ArrowUpRight}
             />
           </div>

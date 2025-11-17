@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchCampaigns } from "@/lib/storageApi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -7,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { 
   LayoutDashboard, 
+  Joystick,
   CheckSquare, 
   Calendar as CalendarIcon, 
   BarChart3, 
@@ -36,6 +39,7 @@ interface Event {
   day: number;
   icon: string;
   completed?: boolean;
+  isCampaign?: boolean;
 }
 
 const iconOptions = [
@@ -66,6 +70,8 @@ const Calendar = () => {
   const [eventName, setEventName] = useState("");
   const [selectedColor, setSelectedColor] = useState("bg-blue-500");
   const [selectedIcon, setSelectedIcon] = useState("star");
+
+  const { data: campaigns = [] } = useQuery({ queryKey: ['campaigns'], queryFn: fetchCampaigns });
 
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -131,7 +137,31 @@ const Calendar = () => {
   };
 
   const getEventsForDay = (day: number) => {
-    return events.filter(event => event.day === day);
+    const userEvents = events.filter(event => event.day === day);
+    
+    // Add campaign events for days within campaign date range
+    const campaignEvents = campaigns
+      .filter((c: any) => {
+        const start = new Date(c.startDate);
+        const end = new Date(c.endDate);
+        const currentDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+        return currentDay >= start && currentDay <= end &&
+               start.getMonth() === currentDate.getMonth() && start.getFullYear() === currentDate.getFullYear() ||
+               end.getMonth() === currentDate.getMonth() && end.getFullYear() === currentDate.getFullYear() ||
+               (currentDay.getMonth() === currentDate.getMonth() && currentDay.getFullYear() === currentDate.getFullYear() &&
+                start <= currentDay && end >= currentDay);
+      })
+      .map((c: any) => ({
+        id: `campaign-${c.id}-${day}`,
+        name: c.name,
+        color: c.status === 'completed' ? 'bg-green-600' : c.status === 'in-progress' ? 'bg-blue-600' : 'bg-purple-600',
+        day,
+        icon: 'flag',
+        completed: c.status === 'completed',
+        isCampaign: true,
+      }));
+
+    return [...userEvents, ...campaignEvents];
   };
 
   const renderCalendar = () => {
@@ -171,9 +201,11 @@ const Calendar = () => {
                     <IconComponent className={`h-3 w-3 flex-shrink-0 ${event.completed ? 'opacity-60' : ''}`} />
                   </button>
                   <span className={`truncate ${event.completed ? 'line-through opacity-60' : ''}`}>{event.name}</span>
-                  <button onClick={(e) => { e.stopPropagation(); deleteEvent(event.id); }} className="ml-auto">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {!event.isCampaign && (
+                    <button onClick={(e) => { e.stopPropagation(); deleteEvent(event.id); }} className="ml-auto">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -191,7 +223,7 @@ const Calendar = () => {
       <aside className="w-64 bg-card border-r border-border p-6 hidden md:block">
         <div className="flex items-center gap-2 mb-8">
           <div className="h-8 w-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-            <LayoutDashboard className="h-5 w-5 text-white" />
+            <Joystick className="h-5 w-5 text-white" />
           </div>
           <span className="text-xl font-bold">Game Day</span>
         </div>

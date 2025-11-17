@@ -7,10 +7,22 @@ import Login from "./pages/Login";
 import GameDay from "./pages/GameDay";
 import Tasks from "./pages/Tasks";
 import Calendar from "./pages/Calendar";
-import Equipe from "./pages/Equipe";
+import Players from "./pages/Players";
+import Campaigns from "./pages/Campaigns";
+import Questions from "./pages/Questions";
+import Teams from "./pages/Teams";
+import Scoreboard from "./pages/Scoreboard";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -22,8 +34,12 @@ const App = () => (
           <Route path="/" element={<Login />} />
           <Route path="/game-day" element={<GameDay />} />
           <Route path="/tasks" element={<Tasks />} />
+          <Route path="/campaigns" element={<Campaigns />} />
+          <Route path="/questions" element={<Questions />} />
           <Route path="/calendar" element={<Calendar />} />
-          <Route path="/equipe" element={<Equipe />} />
+          <Route path="/players" element={<Players />} />
+          <Route path="/teams" element={<Teams />} />
+          <Route path="/scoreboard" element={<Scoreboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
