@@ -15,6 +15,7 @@ import {
   HelpCircle,
   LogOut,
   Play,
+  ShoppingBag,
 } from "lucide-react";
 
 const Sidebar: React.FC = () => {
@@ -55,6 +56,10 @@ const Sidebar: React.FC = () => {
         <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/calendar')}>
           <Calendar className="h-4 w-4" />
           Calendário
+        </Button>
+        <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/lojinha')}>
+          <ShoppingBag className="h-4 w-4" />
+          Lojinha
         </Button>
         {/* Classificação removed */}
 

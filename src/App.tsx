@@ -12,6 +12,7 @@ import Questions from "./pages/Questions";
 import Teams from "./pages/Teams";
 import Settings from "./pages/Settings";
 import AcceptInvite from "./pages/AcceptInvite";
+import Store from "./pages/Store";
 // Tasks and Scoreboard removed
 import NotFound from "./pages/NotFound";
 
@@ -39,6 +40,7 @@ const App = () => (
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/players" element={<Players />} />
           <Route path="/teams" element={<Teams />} />
+          <Route path="/lojinha" element={<Store />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
           {/* /tasks and /scoreboard routes removed */}

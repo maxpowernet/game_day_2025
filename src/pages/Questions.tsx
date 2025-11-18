@@ -75,10 +75,13 @@ const Questions = () => {
     choice2: "",
     choice3: "",
     answer: 0,
-    pointsOnTime: 10,
-    pointsLate: 5,
+    pointsOnTime: 1000,
+    pointsLate: 500,
     status: "todo" as "todo" | "in-progress" | "completed",
     priority: "medium" as "low" | "medium" | "high",
+    isSpecial: false,
+    specialStartAt: "",
+    specialWindowMinutes: 1,
   });
 
   const addMutation = useMutation({
@@ -107,10 +110,13 @@ const Questions = () => {
         choice2: q.choices[2] || "",
         choice3: q.choices[3] || "",
         answer: q.answer,
-        pointsOnTime: q.pointsOnTime ?? 10,
-        pointsLate: q.pointsLate ?? 5,
+        pointsOnTime: q.pointsOnTime ?? 1000,
+        pointsLate: q.pointsLate ?? 500,
         status: q.status,
         priority: q.priority ?? "medium",
+        isSpecial: q.isSpecial ?? false,
+        specialStartAt: q.specialStartAt ?? "",
+        specialWindowMinutes: q.specialWindowMinutes ?? 1,
       });
     } else {
       setEditingQuestion(null);
@@ -122,10 +128,13 @@ const Questions = () => {
         choice2: "",
         choice3: "",
         answer: 0,
-        pointsOnTime: 10,
-        pointsLate: 5,
+        pointsOnTime: 1000,
+        pointsLate: 500,
         status: "todo",
         priority: "medium",
+        isSpecial: false,
+        specialStartAt: "",
+        specialWindowMinutes: 1,
       });
     }
     setIsDialogOpen(true);
@@ -168,6 +177,9 @@ const Questions = () => {
       answer: Math.min(form.answer, choices.length - 1),
       pointsOnTime: form.pointsOnTime,
       pointsLate: form.pointsLate,
+      isSpecial: form.isSpecial,
+      specialStartAt: form.specialStartAt || undefined,
+      specialWindowMinutes: form.specialWindowMinutes,
       status: form.status,
       priority: form.priority,
       scheduleTime: "08:00",
@@ -366,7 +378,12 @@ const Questions = () => {
                               <div className='h-9 w-9 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0'>
                                 <HelpCircle className='h-5 w-5 text-primary' />
                               </div>
-                              <span className='font-medium line-clamp-2'>{question.text}</span>
+                              <div className='flex items-center gap-2'>
+                                <span className='font-medium line-clamp-2'>{question.text}</span>
+                                {question.isSpecial && (
+                                  <Badge variant='destructive' className='text-xs'>Estrela</Badge>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -513,6 +530,41 @@ const Questions = () => {
                   onChange={(e) => setForm({ ...form, pointsLate: parseInt(e.target.value, 10) || 0 })}
                 />
               </div>
+            </div>
+            <div className='grid grid-cols-1 gap-2'>
+              <div className='flex items-center gap-3'>
+                <input
+                  id='isSpecial'
+                  type='checkbox'
+                  checked={form.isSpecial}
+                  onChange={(e) => setForm({ ...form, isSpecial: e.target.checked })}
+                  className='h-4 w-4'
+                />
+                <Label htmlFor='isSpecial' className='m-0'>Marcar como pergunta especial</Label>
+              </div>
+              {form.isSpecial && (
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                  <div className='space-y-2'>
+                    <Label>Início da janela (data + hora)</Label>
+                    <Input
+                      id='specialStartAt'
+                      type='datetime-local'
+                      value={form.specialStartAt}
+                      onChange={(e) => setForm({ ...form, specialStartAt: e.target.value })}
+                    />
+                  </div>
+                  <div className='space-y-2'>
+                    <Label>Janela Máxima (minutos)</Label>
+                    <Input
+                      id='specialWindowMinutes'
+                      type='number'
+                      min={1}
+                      value={form.specialWindowMinutes}
+                      onChange={(e) => setForm({ ...form, specialWindowMinutes: parseInt(e.target.value, 10) || 1 })}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <div className='grid grid-cols-2 gap-4'>
               <div className='space-y-2'>

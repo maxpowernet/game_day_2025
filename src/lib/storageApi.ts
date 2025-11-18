@@ -5,6 +5,7 @@ export interface Player {
   task?: string;
   status?: string;
   score: number; // total across all campaigns
+  gameCoins?: number; // coins earned (1 point = 1 gamecoin)
   teamId?: number;
   campaignScores?: { [campaignId: number]: number }; // points per campaign
 }
@@ -44,6 +45,9 @@ export interface Question {
   pointsLate: number; // points if answered late
   scheduleTime?: string; // "08:00" opening time (Brasilia)
   deadlineTime?: string; // "18:00" closing time (Brasilia)
+  isSpecial?: boolean; // special question (starred)
+  specialStartAt?: string; // ISO datetime when special starts (max points window)
+  specialWindowMinutes?: number; // duration in minutes for special max window (default 1)
 }
 
 export interface Answer {
@@ -55,6 +59,29 @@ export interface Answer {
   selectedAnswer: number;
   pointsEarned: number; // calculated based on time
   isOnTime: boolean; // true if answered within schedule
+  isCorrect?: boolean; // whether the selected answer was correct
+}
+
+export interface Product {
+  id: number;
+  name: string;
+  description: string;
+  imageUrl: string;
+  priceInGameCoins: number;
+  quantity: number; // available stock
+  campaignId: number;
+  availableFrom: string; // ISO date when product becomes visible
+  availableUntil: string; // ISO date when product is no longer available
+  createdAt: string;
+}
+
+export interface Purchase {
+  id: number;
+  playerId: number;
+  productId: number;
+  campaignId: number;
+  purchasedAt: string; // ISO timestamp
+  priceInGameCoins: number; // price paid at purchase time
 }
 
 function read<T>(key: string, fallback: T): T {
@@ -221,9 +248,132 @@ export async function addAnswer(a: Omit<Answer, 'id'>): Promise<Answer> {
   return Promise.resolve(next);
 }
 
+// Add answer with validation: only one answer per player per question, compute points
+export async function submitAnswer(a: Omit<Answer, 'id' | 'answeredAt' | 'pointsEarned' | 'isOnTime'>): Promise<Answer> {
+  const allAnswers = read<Answer[]>('gd_answers', []);
+  // prevent duplicate answer by same player for same question
+  const already = allAnswers.find(x => x.playerId === a.playerId && x.questionId === a.questionId);
+  if (already) return Promise.reject(new Error('Player has already answered this question'));
+
+  // fetch question
+  const questions = read<Question[]>('gd_questions', []);
+  const question = questions.find(q => q.id === a.questionId);
+  if (!question) return Promise.reject(new Error('Question not found'));
+
+  const now = new Date();
+  const answeredAt = now.toISOString();
+
+  // compute onTime for special questions
+  let isOnTime = false;
+  let points = 0;
+
+  if (question.isSpecial && question.specialStartAt) {
+    const start = new Date(question.specialStartAt);
+    const windowMin = question.specialWindowMinutes ?? 1;
+    const end = new Date(start.getTime() + windowMin * 60 * 1000);
+    if (now >= start && now <= end) {
+      isOnTime = true;
+    } else {
+      isOnTime = false;
+    }
+  } else {
+    // regular question: determine the date for this question based on campaign start + dayIndex
+    const campaigns = read<Campaign[]>('gd_campaigns', []);
+    const campaign = campaigns.find(c => c.id === question.campaignId);
+    if (!campaign) return Promise.reject(new Error('Campaign not found'));
+    const campaignStart = new Date(campaign.startDate);
+    const questionDate = new Date(campaignStart.getTime() + question.dayIndex * 24 * 60 * 60 * 1000);
+
+    // build opening and closing datetimes using scheduleTime and deadlineTime
+    const scheduleParts = (question.scheduleTime || '08:00').split(':').map(Number);
+    const deadlineParts = (question.deadlineTime || '18:00').split(':').map(Number);
+    const openAt = new Date(questionDate);
+    openAt.setHours(scheduleParts[0] ?? 8, scheduleParts[1] ?? 0, 0, 0);
+    const closeAt = new Date(questionDate);
+    closeAt.setHours(deadlineParts[0] ?? 18, deadlineParts[1] ?? 0, 0, 0);
+
+    if (now >= openAt && now <= closeAt) {
+      isOnTime = true;
+    } else {
+      isOnTime = false;
+    }
+  }
+
+  // determine correctness and points (wrong answers also receive points according to rules)
+  const isCorrect = a.selectedAnswer === question.answer;
+  if (isCorrect) {
+    // correct points come from question's configured values
+    points = isOnTime ? (question.pointsOnTime ?? 0) : (question.pointsLate ?? 0);
+  } else {
+    // wrong answer points per your rules
+    if (question.isSpecial) {
+      points = isOnTime ? 600 : 300;
+    } else {
+      points = isOnTime ? 300 : 150;
+    }
+  }
+
+  // persist answer
+  const id = Math.max(0, ...allAnswers.map(x => x.id)) + 1;
+  const next: Answer = { id, ...a, answeredAt, pointsEarned: points, isOnTime, isCorrect } as Answer;
+  allAnswers.push(next);
+  write('gd_answers', allAnswers);
+
+  // update player's score and gameCoins
+  const players = read<Player[]>('gd_players', []);
+  const player = players.find(p => p.id === a.playerId);
+  if (player) {
+    player.score = (player.score || 0) + points;
+    player.gameCoins = (player.gameCoins || 0) + points; // 1 point = 1 gamecoin
+    // update campaignScores
+    player.campaignScores = player.campaignScores || {};
+    player.campaignScores[a.campaignId] = (player.campaignScores[a.campaignId] || 0) + points;
+    write('gd_players', players);
+  }
+
+  return Promise.resolve(next);
+}
+
 export async function getPlayerAnswersForCampaign(playerId: number, campaignId: number): Promise<Answer[]> {
   const all = read<Answer[]>('gd_answers', []);
   return Promise.resolve(all.filter(a => a.playerId === playerId && a.campaignId === campaignId));
+}
+
+// Return visible questions for a player in a campaign.
+// Rules:
+// - One regular question per day: the earliest unanswered question with dayIndex <= todayIndex
+// - Special questions are visible when their specialStartAt <= now (and unanswered)
+export async function getVisibleQuestionsForPlayer(playerId: number, campaignId: number): Promise<Question[]> {
+  const questions = read<Question[]>('gd_questions', []).filter(q => q.campaignId === campaignId);
+  const answers = read<Answer[]>('gd_answers', []).filter(a => a.playerId === playerId && a.campaignId === campaignId);
+  const campaigns = read<Campaign[]>('gd_campaigns', []);
+  const campaign = campaigns.find(c => c.id === campaignId);
+  if (!campaign) return Promise.resolve([]);
+
+  const now = new Date();
+  const campaignStart = new Date(campaign.startDate);
+  const dayIndexNow = Math.floor((now.getTime() - campaignStart.getTime()) / (24 * 60 * 60 * 1000));
+
+  // regular questions: earliest unanswered with dayIndex <= dayIndexNow
+  const regularCandidates = questions.filter(q => !q.isSpecial).sort((a, b) => a.dayIndex - b.dayIndex);
+  let visibleRegular: Question | null = null;
+  for (const q of regularCandidates) {
+    if (q.dayIndex <= dayIndexNow) {
+      const answered = answers.find(a => a.questionId === q.id);
+      if (!answered) { visibleRegular = q; break; }
+    }
+  }
+
+  // special questions: those with specialStartAt <= now and unanswered
+  const specialVisible = questions.filter(q => q.isSpecial && q.specialStartAt).filter(q => {
+    const start = new Date(q.specialStartAt!);
+    return start <= now && !answers.find(a => a.questionId === q.id);
+  });
+
+  const result: Question[] = [];
+  if (visibleRegular) result.push(visibleRegular);
+  if (specialVisible.length) result.push(...specialVisible);
+  return Promise.resolve(result);
 }
 
 // Admins
@@ -298,6 +448,83 @@ export async function deleteMessage(id: number): Promise<void> {
   const next = list.filter(m => m.id !== id);
   write('gd_messages', next);
   return Promise.resolve();
+}
+
+// Products
+export async function fetchProducts(): Promise<Product[]> {
+  return Promise.resolve(read<Product[]>('gd_products', []));
+}
+
+export async function addProduct(p: Omit<Product, 'id' | 'createdAt'>): Promise<Product> {
+  const list = read<Product[]>('gd_products', []);
+  const id = Math.max(0, ...list.map(x => x.id)) + 1;
+  const next: Product = { id, ...p, createdAt: new Date().toISOString() } as Product;
+  list.push(next);
+  write('gd_products', list);
+  return Promise.resolve(next);
+}
+
+export async function updateProduct(updated: Product): Promise<Product> {
+  const list = read<Product[]>('gd_products', []);
+  const next = list.map(p => p.id === updated.id ? updated : p);
+  write('gd_products', next);
+  return Promise.resolve(updated);
+}
+
+export async function deleteProduct(id: number): Promise<void> {
+  const list = read<Product[]>('gd_products', []);
+  const next = list.filter(p => p.id !== id);
+  write('gd_products', next);
+  return Promise.resolve();
+}
+
+// Purchases
+export async function fetchPurchases(): Promise<Purchase[]> {
+  return Promise.resolve(read<Purchase[]>('gd_purchases', []));
+}
+
+export async function addPurchase(p: Omit<Purchase, 'id' | 'purchasedAt'>): Promise<Purchase> {
+  const list = read<Purchase[]>('gd_purchases', []);
+  // prevent duplicate purchase of same product by same player
+  const already = list.find(x => x.playerId === p.playerId && x.productId === p.productId);
+  if (already) return Promise.reject(new Error('Player has already purchased this product'));
+
+  // check player has enough gameCoins
+  const players = read<Player[]>('gd_players', []);
+  const player = players.find(pl => pl.id === p.playerId);
+  if (!player) return Promise.reject(new Error('Player not found'));
+
+  const products = read<Product[]>('gd_products', []);
+  const product = products.find(pr => pr.id === p.productId);
+  if (!product) return Promise.reject(new Error('Product not found'));
+
+  const purchasedCount = list.filter(x => x.productId === p.productId).length;
+  const remaining = product.quantity - purchasedCount;
+  if (remaining <= 0) return Promise.reject(new Error('Product out of stock'));
+
+  if ((player.gameCoins || 0) < p.priceInGameCoins) return Promise.reject(new Error('Insufficient gameCoins'));
+
+  // create purchase
+  const id = Math.max(0, ...list.map(x => x.id)) + 1;
+  const next: Purchase = { id, ...p, purchasedAt: new Date().toISOString() } as Purchase;
+  list.push(next);
+  write('gd_purchases', list);
+
+  // deduct coins
+  player.gameCoins = (player.gameCoins || 0) - p.priceInGameCoins;
+  write('gd_players', players);
+
+  return Promise.resolve(next);
+}
+
+export async function getPlayerPurchases(playerId: number): Promise<Purchase[]> {
+  const all = read<Purchase[]>('gd_purchases', []);
+  return Promise.resolve(all.filter(p => p.playerId === playerId));
+}
+
+export async function getProductPurchases(productId: number): Promise<Purchase[]> {
+  const all = read<Purchase[]>('gd_purchases', []);
+  return Promise.resolve(all.filter(p => p.productId === productId));
 }
 
 export default null;
