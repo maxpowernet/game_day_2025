@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchAdmins, updateAdmin } from '@/lib/storageApi';
+import { toast } from '@/components/ui/sonner';
 
 const AcceptInvite = () => {
   const [searchParams] = useSearchParams();
@@ -27,7 +28,7 @@ const AcceptInvite = () => {
   const accept = () => {
     if (!admin) return;
     updateAdminMutation.mutate({ ...admin, invited: false, inviteToken: undefined });
-    alert('Convite aceito. Administrador ativado.');
+    toast({ title: 'Convite aceito', description: 'Administrador ativado.' } as any);
     navigate('/login');
   };
 

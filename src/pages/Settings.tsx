@@ -4,12 +4,25 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import UserProfile from '@/components/UserProfile';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchAdmins, addAdmin, updateAdmin, fetchMessages, updateMessage, deleteMessage, Admin, MessageItem } from '@/lib/storageApi';
+import { fetchAdmins, addAdmin, updateAdmin, deleteAdmin, fetchMessages, updateMessage, deleteMessage, Admin, MessageItem } from '@/lib/storageApi';
+import { Edit, Trash2, Mail } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 
 const Settings = () => {
   const queryClient = useQueryClient();
@@ -21,6 +34,7 @@ const Settings = () => {
   const updateAdminMutation = useMutation({ mutationFn: (a: Admin) => updateAdmin(a), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admins'] }) });
   const updateMessageMutation = useMutation({ mutationFn: (m: MessageItem) => updateMessage(m), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['messages'] }) });
   const deleteMessageMutation = useMutation({ mutationFn: (id: number) => deleteMessage(id), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['messages'] }) });
+  const deleteAdminMutation = useMutation({ mutationFn: (id: number) => deleteAdmin(id), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admins'] }) });
 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
@@ -30,12 +44,12 @@ const Settings = () => {
   const generateToken = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 
   const sendInvite = () => {
-    if (!inviteEmail || !inviteName) return alert('Preencha nome e email');
+    if (!inviteEmail || !inviteName) return toast({ title: 'Erro', description: 'Preencha nome e email', variant: 'destructive' } as any);
     const token = generateToken();
     addAdminMutation.mutate({ name: inviteName, email: inviteEmail, invited: true, inviteToken: token });
     setInviteEmail(''); setInviteName('');
     const link = `${window.location.origin}/accept-invite?token=${token}`;
-    alert(`Convite enviado (simulado). Link de ativação:\n${link}`);
+  toast('Convite enviado', { description: link, action: { label: 'Copiar', onClick: () => navigator.clipboard.writeText(link) } } as any);
   };
 
   const activateAdmin = (a: Admin) => {
@@ -48,10 +62,55 @@ const Settings = () => {
     updateMessageMutation.mutate({ ...m, handled: true });
   };
 
-  const removeMessage = (id: number) => {
-    if (!confirm('Remover mensagem?')) return;
-    deleteMessageMutation.mutate(id);
+  // Confirmation dialog state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmData, setConfirmData] = useState<null | { type: 'message' | 'admin'; id: number; title: string; description?: string }>(null);
+
+  const openConfirm = (type: 'message' | 'admin', id: number, title: string, description?: string) => {
+    setConfirmData({ type, id, title, description });
+    setConfirmOpen(true);
   };
+
+  const handleConfirm = () => {
+    if (!confirmData) return;
+    const { type, id } = confirmData;
+    setConfirmOpen(false);
+    setConfirmData(null);
+    if (type === 'message') {
+      deleteMessageMutation.mutate(id, {
+        onSuccess: () => toast({ title: 'Mensagem removida', description: 'A mensagem foi removida com sucesso.' } as any),
+      });
+    } else if (type === 'admin') {
+      deleteAdminMutation.mutate(id, {
+        onSuccess: () => toast({ title: 'Administrador removido', description: 'O administrador foi removido com sucesso.' } as any),
+      });
+    }
+  };
+
+  // Edit modal state
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+
+  const openEditModal = (a: Admin) => {
+    setSelectedAdmin(a);
+    setEditName(a.name);
+    setEditEmail(a.email);
+    setIsEditOpen(true);
+  };
+
+  const saveEditAdmin = () => {
+    if (!selectedAdmin) return;
+    const name = editName.trim();
+    const email = editEmail.trim();
+    if (!name || !email) return toast({ title: 'Erro', description: 'Nome e email são obrigatórios', variant: 'destructive' } as any);
+    updateAdminMutation.mutate({ ...selectedAdmin, name, email });
+    setIsEditOpen(false);
+    setSelectedAdmin(null);
+  };
+
+  
 
   return (
     <div className='flex min-h-screen bg-background'>
@@ -79,7 +138,6 @@ const Settings = () => {
                 </div>
               ) : (
                 <div className='mb-4'>
-                  <p className='text-sm mb-2'>Administradores cadastrados:</p>
                   <div className='space-y-2'>
                     {admins.map((a: Admin) => (
                       <div key={a.id} className='flex items-center justify-between p-2 border rounded'>
@@ -97,7 +155,7 @@ const Settings = () => {
                               const newToken = generateToken();
                               updateAdminMutation.mutate({ ...a, inviteToken: newToken, invited: true });
                               const link = `${window.location.origin}/accept-invite?token=${newToken}`;
-                              alert(`Convite reenviado (simulado). Link de ativação:\n${link}`);
+                              toast('Convite reenviado', { description: link, action: { label: 'Copiar', onClick: () => navigator.clipboard.writeText(link) } } as any);
                             }}>Reenviar</Button>
                           )}
                         </div>
@@ -122,9 +180,89 @@ const Settings = () => {
               </div>
             </Card>
 
+            {/* Edit Admin Modal */}
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Administrador</DialogTitle>
+                </DialogHeader>
+                <div className='space-y-4 py-2'>
+                  <div>
+                    <Label>Nome</Label>
+                    <Input value={editName} onChange={(e:any) => setEditName(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Email</Label>
+                    <Input value={editEmail} onChange={(e:any) => setEditEmail(e.target.value)} />
+                  </div>
+                  <div className='flex gap-2 justify-end'>
+                    <Button variant='ghost' onClick={() => { setIsEditOpen(false); setSelectedAdmin(null); }}>Cancelar</Button>
+                    <Button onClick={saveEditAdmin} disabled={updateAdminMutation.status === 'pending'}>{updateAdminMutation.status === 'pending' ? 'Salvando...' : 'Salvar'}</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Administrators table below the invite card */}
+            <Card className='p-6'>
+              <h3 className='text-lg font-semibold mb-2'>Lista de Administradores</h3>
+              <p className='text-sm text-muted-foreground mb-4'>Tabela com administradores do sistema.</p>
+
+              <div className='rounded-md border'>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead className='w-[120px] text-center'>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {admins.length === 0 ? (
+                      <TableRow><TableCell colSpan={3} className='text-center text-muted-foreground py-8'>Nenhum administrador cadastrado.</TableCell></TableRow>
+                    ) : (
+                      admins.map((a: Admin) => (
+                        <TableRow key={a.id}>
+                          <TableCell>
+                            <div className='flex items-center gap-3'>
+                              <Avatar className='h-8 w-8'><AvatarFallback className='bg-primary text-white'>{a.name.split(' ').map(n => n[0]).join('').slice(0,2)}</AvatarFallback></Avatar>
+                              <div>
+                                <div className='font-medium'>{a.name}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className='text-sm text-muted-foreground'>{a.email}</div>
+                          </TableCell>
+                          <TableCell className='text-center'>
+                            <div className='flex items-center justify-center gap-2'>
+                                  <Button variant='ghost' size='icon' onClick={() => openEditModal(a)} title='Alterar nome'>
+                                    <Edit className='h-4 w-4' />
+                                  </Button>
+                                  <Button variant='ghost' size='icon' onClick={() => {
+                                    const newToken = generateToken();
+                                    updateAdminMutation.mutate({ ...a, inviteToken: newToken, invited: true });
+                                    const link = `${window.location.origin}/accept-invite?token=${newToken}`;
+                                    toast('Convite reenviado', { description: link, action: { label: 'Copiar', onClick: () => navigator.clipboard.writeText(link) } } as any);
+                                  }} title='Reenviar convite'>
+                                    <Mail className='h-4 w-4' />
+                                  </Button>
+                                  <Button variant='ghost' size='icon' onClick={() => openConfirm('admin', a.id, 'Remover administrador?', 'Tem certeza que deseja remover este administrador?')} title='Excluir administrador'>
+                                    <Trash2 className='h-4 w-4 text-destructive' />
+                                  </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+
             
 
-            <Card className='p-6 col-span-1 lg:col-span-3'>
+            <Card className='p-6 col-span-1 lg:col-span-2'>
               <h3 className='text-lg font-semibold mb-2'>Caixa de Mensagens</h3>
               <p className='text-sm text-muted-foreground mb-4'>Mensagens recebidas de jogadores ou de outras plataformas. Use para receber reports de erros e enviar soluções.</p>
 
@@ -158,7 +296,7 @@ const Settings = () => {
                           <TableCell className='text-center'>
                             <div className='flex items-center justify-center gap-2'>
                               <Button size='sm' onClick={() => markHandled(m)}>Marcar como tratada</Button>
-                              <Button variant='ghost' size='sm' onClick={() => removeMessage(m.id)}>Remover</Button>
+                              <Button variant='ghost' size='sm' onClick={() => openConfirm('message', m.id, 'Remover mensagem?', 'Tem certeza que deseja remover esta mensagem?')}>Remover</Button>
                             </div>
                           </TableCell>
                         </TableRow>

@@ -17,6 +17,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchCampaigns, fetchPlayers, addCampaign as apiAddCampaign, updateCampaign as apiUpdateCampaign, deleteCampaign as apiDeleteCampaign, type Campaign } from "@/lib/storageApi";
+import { toast } from '@/components/ui/sonner';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 
 const Campaigns = () => {
   const navigate = useNavigate();
@@ -45,9 +47,26 @@ const Campaigns = () => {
     setIsDialogOpen(true);
   };
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmData, setConfirmData] = useState<null | { id: number; title: string; description?: string }>(null);
+
+  const openConfirm = (id: number, title: string, description?: string) => {
+    setConfirmData({ id, title, description });
+    setConfirmOpen(true);
+  };
+
+  const handleConfirm = () => {
+    if (!confirmData) return;
+    deleteMutation.mutate(confirmData.id, {
+      onSuccess: () => toast({ title: 'Campanha removida', description: 'A campanha foi removida com sucesso.' } as any)
+    });
+    setConfirmOpen(false);
+    setConfirmData(null);
+  };
+
   const save = () => {
-    if (!form.name) return alert("Nome obrigatório");
-    if (!form.startDate || !form.endDate) return alert("Datas obrigatórias");
+    if (!form.name) return toast({ title: 'Erro', description: 'Nome obrigatório', variant: 'destructive' } as any);
+    if (!form.startDate || !form.endDate) return toast({ title: 'Erro', description: 'Datas obrigatórias', variant: 'destructive' } as any);
     const payload: any = { 
       name: form.name, 
       startDate: form.startDate, 
@@ -62,7 +81,7 @@ const Campaigns = () => {
     setIsDialogOpen(false);
   };
 
-  const remove = (id: number) => { if (confirm("Remover campanha?")) deleteMutation.mutate(id); };
+  const remove = (id: number) => { openConfirm(id, 'Remover campanha?', 'Tem certeza que deseja remover esta campanha?'); };
 
   const filtered = campaigns.filter((c: any) => filter === "all" || c.status === filter);
 
@@ -218,6 +237,21 @@ const Campaigns = () => {
             </div>
           </DialogContent>
         </Dialog>
+        {/* Confirm dialog for deletions */}
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{confirmData?.title}</AlertDialogTitle>
+            </AlertDialogHeader>
+            <div className='py-2'>
+              <p className='text-sm text-muted-foreground'>{confirmData?.description}</p>
+              <div className='flex justify-end gap-2 mt-4'>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirm}>Confirmar</AlertDialogAction>
+              </div>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

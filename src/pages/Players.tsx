@@ -33,6 +33,7 @@ import {
 import Sidebar from '@/components/Sidebar';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/components/ui/sonner';
 import {
   fetchPlayers,
   addPlayer as apiAddPlayer,
@@ -105,9 +106,9 @@ const Players = () => {
       try {
         const data = JSON.parse(String(reader.result));
         await apiSetPlayers(data as any);
-        queryClient.invalidateQueries(['players']);
+  queryClient.invalidateQueries({ queryKey: ['players'] });
       } catch (e) {
-        alert('Arquivo inválido');
+        toast({ title: 'Erro', description: 'Arquivo inválido', variant: 'destructive' } as any);
       }
     };
     reader.readAsText(file);

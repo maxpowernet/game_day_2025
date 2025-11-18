@@ -31,6 +31,8 @@ import {
   setTeams as apiSetTeams,
   type Team,
 } from '@/lib/storageApi';
+import { toast } from '@/components/ui/sonner';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 
 const Teams = () => {
   const navigate = useNavigate();
@@ -54,14 +56,31 @@ const Teams = () => {
     setIsDialogOpen(true);
   };
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmData, setConfirmData] = useState<null | { id: number; title: string; description?: string }>(null);
+
+  const openConfirm = (id: number, title: string, description?: string) => {
+    setConfirmData({ id, title, description });
+    setConfirmOpen(true);
+  };
+
+  const handleConfirm = () => {
+    if (!confirmData) return;
+    deleteMutation.mutate(confirmData.id, {
+      onSuccess: () => toast({ title: 'Equipe removida', description: 'A equipe foi removida com sucesso.' } as any)
+    });
+    setConfirmOpen(false);
+    setConfirmData(null);
+  };
+
   const saveTeam = () => {
-    if (!form.name) return alert('Preencha o nome da equipe');
+    if (!form.name) return toast({ title: 'Erro', description: 'Preencha o nome da equipe', variant: 'destructive' } as any);
     const payload = { name: form.name, members: form.members, createdAt: new Date().toISOString() } as any;
     if (editingTeam) updateMutation.mutate({ ...editingTeam, ...payload }); else addMutation.mutate(payload);
     setIsDialogOpen(false);
   };
 
-  const removeTeam = (id: number) => { if (confirm('Remover equipe?')) deleteMutation.mutate(id); };
+  const removeTeam = (id: number) => { openConfirm(id, 'Remover equipe?', 'Tem certeza que deseja remover esta equipe?'); };
 
   const exportTeams = () => {
     const blob = new Blob([JSON.stringify(teams || [], null, 2)], { type: 'application/json' });
@@ -71,7 +90,7 @@ const Teams = () => {
   const importTeamsFile = (file: File | null) => {
     if (!file) return; const reader = new FileReader(); reader.onload = async () => {
       try { const data = JSON.parse(String(reader.result)); await apiSetTeams(data); queryClient.invalidateQueries({ queryKey: ['teams'] }); }
-      catch { alert('Arquivo inválido'); }
+      catch { toast({ title: 'Erro', description: 'Arquivo inválido', variant: 'destructive' } as any); }
     }; reader.readAsText(file);
   };
 
@@ -166,6 +185,20 @@ const Teams = () => {
             </div>
           </DialogContent>
         </Dialog>
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{confirmData?.title}</AlertDialogTitle>
+            </AlertDialogHeader>
+            <div className='py-2'>
+              <p className='text-sm text-muted-foreground'>{confirmData?.description}</p>
+              <div className='flex justify-end gap-2 mt-4'>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirm}>Confirmar</AlertDialogAction>
+              </div>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

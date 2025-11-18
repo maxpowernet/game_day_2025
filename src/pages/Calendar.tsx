@@ -32,6 +32,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import Sidebar from '@/components/Sidebar';
+import UserProfile from '@/components/UserProfile';
 
 interface Event {
   id: string;
@@ -244,15 +245,7 @@ const Calendar = () => {
               <Button variant="ghost" size="icon">
                 <Bell className="h-5 w-5" />
               </Button>
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback className="bg-primary text-white">TM</AvatarFallback>
-                </Avatar>
-                <div className="hidden md:block">
-                  <p className="text-sm font-semibold">Totok Michael</p>
-                  <p className="text-xs text-muted-foreground">tmichael20@mail.com</p>
-                </div>
-              </div>
+              <UserProfile />
             </div>
           </div>
         </header>

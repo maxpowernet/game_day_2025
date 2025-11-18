@@ -50,6 +50,8 @@ import {
   setQuestions as apiSetQuestions,
   type Question,
 } from "@/lib/storageApi";
+import { toast } from '@/components/ui/sonner';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 
 interface LocalQuestion extends Question {}
 
@@ -129,9 +131,26 @@ const Questions = () => {
     setIsDialogOpen(true);
   };
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmData, setConfirmData] = useState<null | { id: number; title: string; description?: string }>(null);
+
+  const openConfirm = (id: number, title: string, description?: string) => {
+    setConfirmData({ id, title, description });
+    setConfirmOpen(true);
+  };
+
+  const handleConfirm = () => {
+    if (!confirmData) return;
+    deleteMutation.mutate(confirmData.id, {
+      onSuccess: () => toast({ title: 'Pergunta removida', description: 'A pergunta foi removida com sucesso.' } as any)
+    });
+    setConfirmOpen(false);
+    setConfirmData(null);
+  };
+
   const saveQuestion = () => {
-    if (!form.campaignId) return alert("Selecione uma campanha primeiro");
-    if (!form.text || !form.choice0) return alert("Preencha enunciado e pelo menos uma alternativa");
+    if (!form.campaignId) return toast({ title: 'Erro', description: 'Selecione uma campanha primeiro', variant: 'destructive' } as any);
+    if (!form.text || !form.choice0) return toast({ title: 'Erro', description: 'Preencha enunciado e pelo menos uma alternativa', variant: 'destructive' } as any);
 
     const choices = [form.choice0, form.choice1, form.choice2, form.choice3].filter(Boolean);
     
@@ -164,7 +183,7 @@ const Questions = () => {
   };
 
   const removeQuestion = (id: number) => {
-    if (confirm("Remover pergunta?")) deleteMutation.mutate(id);
+    openConfirm(id, 'Remover pergunta?', 'Tem certeza que deseja remover esta pergunta?');
   };
 
   const exportQuestions = () => {
@@ -207,10 +226,10 @@ const Questions = () => {
           await apiSetQuestions(data as any);
           queryClient.invalidateQueries({ queryKey: ['questions'] });
         } else {
-          alert('Nenhuma pergunta válida encontrada no arquivo');
+          toast({ title: 'Aviso', description: 'Nenhuma pergunta válida encontrada no arquivo' } as any);
         }
       } catch (e) {
-        alert('Arquivo inválido');
+        toast({ title: 'Erro', description: 'Arquivo inválido', variant: 'destructive' } as any);
       }
     };
     reader.readAsText(file);
@@ -353,9 +372,14 @@ const Questions = () => {
                           <TableCell>
                             <div className='flex flex-col gap-1'>
                               <Badge variant='outline' className='w-fit'>{campaign?.name || 'Campanha não encontrada'}</Badge>
-                              <span className='text-xs text-muted-foreground'>
-                                Dia {question.dayIndex + 1} {questionDate ? `(${questionDate.toLocaleDateString('pt-BR')})` : ''}
-                              </span>
+                              <div className='flex items-center gap-2'>
+                                <Badge variant='secondary' className='text-xs'>
+                                  Dia {question.dayIndex + 1}
+                                </Badge>
+                                {questionDate && (
+                                  <span className='text-xs text-muted-foreground'>({questionDate.toLocaleDateString('pt-BR')})</span>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -524,6 +548,20 @@ const Questions = () => {
           </div>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmData?.title}</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className='py-2'>
+            <p className='text-sm text-muted-foreground'>{confirmData?.description}</p>
+            <div className='flex justify-end gap-2 mt-4'>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirm}>Confirmar</AlertDialogAction>
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
