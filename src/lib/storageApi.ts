@@ -1,3 +1,5 @@
+import { supabase } from './supabaseClient';
+
 export interface Player {
   id: number;
   name: string;
@@ -8,6 +10,7 @@ export interface Player {
   gameCoins?: number; // coins earned (1 point = 1 gamecoin)
   teamId?: number;
   campaignScores?: { [campaignId: number]: number }; // points per campaign
+  authUid?: string;
 }
 
 export interface Team {
@@ -84,278 +87,875 @@ export interface Purchase {
   priceInGameCoins: number; // price paid at purchase time
 }
 
-function read<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) as T : fallback;
-  } catch (e) {
-    return fallback;
-  }
-}
+// ============================================================================
+// PLAYERS - Supabase CRUD
+// ============================================================================
 
-function write<T>(key: string, value: T) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    // ignore
-  }
-}
 
-// Players
 export async function fetchPlayers(): Promise<Player[]> {
-  return Promise.resolve(read<Player[]>('gd_players', []));
+  const { data, error } = await supabase
+    .from('players')
+    .select('*')
+    .order('id', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching players:', error);
+    return [];
+  }
+  
+  return (data || []).map(p => ({
+    id: p.id,
+    name: p.name,
+    role: p.role,
+    task: p.task,
+    status: p.status,
+    score: p.score || 0,
+    gameCoins: p.game_coins || 0,
+    teamId: p.team_id,
+    authUid: p.auth_uid,
+  }));
 }
 
 export async function setPlayers(players: Player[]): Promise<Player[]> {
-  write('gd_players', players);
-  return Promise.resolve(players);
+  // Bulk upsert (usado para importação)
+  const records = players.map(p => ({
+    id: p.id,
+    name: p.name,
+    role: p.role,
+    task: p.task,
+    status: p.status,
+    score: p.score || 0,
+    game_coins: p.gameCoins || 0,
+    team_id: p.teamId,
+  }));
+  
+  const { error } = await supabase.from('players').upsert(records);
+  if (error) console.error('Error setting players:', error);
+  
+  return fetchPlayers();
 }
 
 export async function addPlayer(p: Omit<Player, 'id'>): Promise<Player> {
-  const list = read<Player[]>('gd_players', []);
-  const id = Math.max(0, ...list.map(x => x.id)) + 1;
-  const next: Player = { id, ...p } as Player;
-  list.push(next);
-  write('gd_players', list);
-  return Promise.resolve(next);
+  const { data, error } = await supabase
+    .from('players')
+    .insert({
+      name: p.name,
+      role: p.role,
+      task: p.task,
+      status: p.status,
+      score: p.score || 0,
+      game_coins: p.gameCoins || 0,
+      team_id: p.teamId,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error adding player:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    name: data.name,
+    role: data.role,
+    task: data.task,
+    status: data.status,
+    score: data.score || 0,
+    gameCoins: data.game_coins || 0,
+    teamId: data.team_id,
+  };
 }
 
 export async function updatePlayer(updated: Player): Promise<Player> {
-  const list = read<Player[]>('gd_players', []);
-  const next = list.map(p => p.id === updated.id ? updated : p);
-  write('gd_players', next);
-  return Promise.resolve(updated);
+  const { data, error } = await supabase
+    .from('players')
+    .update({
+      name: updated.name,
+      role: updated.role,
+      task: updated.task,
+      status: updated.status,
+      score: updated.score || 0,
+      game_coins: updated.gameCoins || 0,
+      team_id: updated.teamId,
+    })
+    .eq('id', updated.id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating player:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    name: data.name,
+    role: data.role,
+    task: data.task,
+    status: data.status,
+    score: data.score || 0,
+    gameCoins: data.game_coins || 0,
+    teamId: data.team_id,
+  };
 }
 
 export async function deletePlayer(id: number): Promise<void> {
-  const list = read<Player[]>('gd_players', []);
-  const next = list.filter(p => p.id !== id);
-  write('gd_players', next);
-  return Promise.resolve();
+  try {
+    // Delete related records first
+    await supabase.from('answers').delete().eq('player_id', id);
+    await supabase.from('purchases').delete().eq('player_id', id);
+    await supabase.from('player_campaign_scores').delete().eq('player_id', id);
+    await supabase.from('campaign_players').delete().eq('player_id', id);
+    await supabase.from('team_members').delete().eq('player_id', id);
+    
+    // Delete the player
+    const { error } = await supabase.from('players').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting player:', error);
+      throw new Error(error.message);
+    }
+  } catch (error: any) {
+    console.error('Error in deletePlayer:', error);
+    throw error;
+  }
 }
 
-// Campaigns
+// ============================================================================
+// CAMPAIGNS - Supabase CRUD
+// ============================================================================
+
 export async function fetchCampaigns(): Promise<Campaign[]> {
-  return Promise.resolve(read<Campaign[]>('gd_campaigns', []));
+  const { data, error } = await supabase
+    .from('campaigns')
+    .select('*, campaign_players(player_id)')
+    .order('id', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching campaigns:', error);
+    return [];
+  }
+  
+  return (data || []).map(c => ({
+    id: c.id,
+    name: c.name,
+    status: c.status as 'planned' | 'in-progress' | 'completed',
+    startDate: c.start_date,
+    endDate: c.end_date,
+    icon: c.icon,
+    playerIds: (c.campaign_players || []).map((cp: any) => cp.player_id),
+    createdAt: c.created_at,
+  }));
 }
 
 export async function setCampaigns(campaigns: Campaign[]): Promise<Campaign[]> {
-  write('gd_campaigns', campaigns);
-  return Promise.resolve(campaigns);
+  const records = campaigns.map(c => ({
+    id: c.id,
+    name: c.name,
+    status: c.status,
+    start_date: c.startDate,
+    end_date: c.endDate,
+    icon: c.icon,
+  }));
+  
+  const { error } = await supabase.from('campaigns').upsert(records);
+  if (error) console.error('Error setting campaigns:', error);
+  
+  return fetchCampaigns();
 }
 
 export async function addCampaign(c: Omit<Campaign, 'id'>): Promise<Campaign> {
-  const list = read<Campaign[]>('gd_campaigns', []);
-  const id = Math.max(0, ...list.map(x => x.id)) + 1;
-  const next = { id, ...c } as Campaign;
-  list.push(next);
-  write('gd_campaigns', list);
-  return Promise.resolve(next);
+  const { data, error } = await supabase
+    .from('campaigns')
+    .insert({
+      name: c.name,
+      status: c.status,
+      start_date: c.startDate,
+      end_date: c.endDate,
+      icon: c.icon,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error adding campaign:', error);
+    throw new Error(error.message);
+  }
+  
+  // Insert campaign_players relationships
+  if (c.playerIds && c.playerIds.length > 0) {
+    const enrollments = c.playerIds.map(playerId => ({
+      campaign_id: data.id,
+      player_id: playerId,
+    }));
+    await supabase.from('campaign_players').insert(enrollments);
+  }
+  
+  return {
+    id: data.id,
+    name: data.name,
+    status: data.status,
+    startDate: data.start_date,
+    endDate: data.end_date,
+    icon: data.icon,
+    playerIds: c.playerIds || [],
+    createdAt: data.created_at,
+  }
 }
 
-// Questions
-export async function fetchQuestions(): Promise<Question[]> {
-  return Promise.resolve(read<Question[]>('gd_questions', []));
-}
-
-export async function setQuestions(questions: Question[]): Promise<Question[]> {
-  write('gd_questions', questions);
-  return Promise.resolve(questions);
-}
-
-export async function addQuestion(q: Omit<Question, 'id'>): Promise<Question> {
-  const list = read<Question[]>('gd_questions', []);
-  const id = Math.max(0, ...list.map(x => x.id)) + 1;
-  const next = { id, ...q } as Question;
-  list.push(next);
-  write('gd_questions', list);
-  return Promise.resolve(next);
-}
-
-export async function updateQuestion(updated: Question): Promise<Question> {
-  const list = read<Question[]>('gd_questions', []);
-  const next = list.map(q => q.id === updated.id ? updated : q);
-  write('gd_questions', next);
-  return Promise.resolve(updated);
-}
-
-export async function deleteQuestion(id: number): Promise<void> {
-  const list = read<Question[]>('gd_questions', []);
-  const next = list.filter(q => q.id !== id);
-  write('gd_questions', next);
-  return Promise.resolve();
-}
-
-// Teams
-export async function fetchTeams(): Promise<Team[]> {
-  return Promise.resolve(read<Team[]>('gd_teams', []));
-}
-
-export async function setTeams(teams: Team[]): Promise<Team[]> {
-  write('gd_teams', teams);
-  return Promise.resolve(teams);
-}
-
-export async function addTeam(t: Omit<Team, 'id'>): Promise<Team> {
-  const list = read<Team[]>('gd_teams', []);
-  const id = Math.max(0, ...list.map(x => x.id)) + 1;
-  const next: Team = { id, ...t } as Team;
-  list.push(next);
-  write('gd_teams', list);
-  return Promise.resolve(next);
-}
-
-export async function updateTeam(updated: Team): Promise<Team> {
-  const list = read<Team[]>('gd_teams', []);
-  const next = list.map(t => t.id === updated.id ? updated : t);
-  write('gd_teams', next);
-  return Promise.resolve(updated);
-}
-
-export async function deleteTeam(id: number): Promise<void> {
-  const list = read<Team[]>('gd_teams', []);
-  const next = list.filter(t => t.id !== id);
-  write('gd_teams', next);
-  return Promise.resolve();
-}
-
-// Enhanced Campaigns
 export async function updateCampaign(updated: Campaign): Promise<Campaign> {
-  const list = read<Campaign[]>('gd_campaigns', []);
-  const next = list.map(c => c.id === updated.id ? updated : c);
-  write('gd_campaigns', next);
-  return Promise.resolve(updated);
+  const { data, error } = await supabase
+    .from('campaigns')
+    .update({
+      name: updated.name,
+      status: updated.status,
+      start_date: updated.startDate,
+      end_date: updated.endDate,
+      icon: updated.icon,
+    })
+    .eq('id', updated.id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating campaign:', error);
+    throw new Error(error.message);
+  }
+  
+  // Update campaign_players relationships
+  await supabase.from('campaign_players').delete().eq('campaign_id', updated.id);
+  
+  if (updated.playerIds && updated.playerIds.length > 0) {
+    const enrollments = updated.playerIds.map(playerId => ({
+      campaign_id: updated.id,
+      player_id: playerId,
+    }));
+    await supabase.from('campaign_players').insert(enrollments);
+  }
+  
+  return {
+    id: data.id,
+    name: data.name,
+    status: data.status,
+    startDate: data.start_date,
+    endDate: data.end_date,
+    icon: data.icon,
+    playerIds: updated.playerIds || [],
+    createdAt: data.created_at,
+  };
 }
 
 export async function deleteCampaign(id: number): Promise<void> {
-  const list = read<Campaign[]>('gd_campaigns', []);
-  const next = list.filter(c => c.id !== id);
-  write('gd_campaigns', next);
-  return Promise.resolve();
+  // Delete related records first to avoid foreign key constraints
+  try {
+    // Delete in order: child records first, then parent
+    await supabase.from('answers').delete().eq('campaign_id', id);
+    await supabase.from('purchases').delete().eq('campaign_id', id);
+    await supabase.from('player_campaign_scores').delete().eq('campaign_id', id);
+    await supabase.from('campaign_players').delete().eq('campaign_id', id);
+    await supabase.from('products').delete().eq('campaign_id', id);
+    await supabase.from('questions').delete().eq('campaign_id', id);
+    await supabase.from('teams').delete().eq('campaign_id', id);
+    
+    // Finally, delete the campaign itself
+    const { error } = await supabase.from('campaigns').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting campaign:', error);
+      throw new Error(error.message);
+    }
+  } catch (error: any) {
+    console.error('Error in deleteCampaign:', error);
+    throw error;
+  }
 }
 
-// Answers
+// ============================================================================
+// QUESTIONS - Supabase CRUD
+// ============================================================================
+
+export async function fetchQuestions(): Promise<Question[]> {
+  const { data, error } = await supabase
+    .from('questions')
+    .select('*')
+    .order('campaign_id', { ascending: true })
+    .order('day_index', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching questions:', error);
+    return [];
+  }
+  
+  return (data || []).map(q => ({
+    id: q.id,
+    campaignId: q.campaign_id,
+    dayIndex: q.day_index,
+    text: q.text,
+    choices: q.choices,
+    answer: q.answer,
+    status: q.status,
+    priority: q.priority,
+    pointsOnTime: q.points_on_time,
+    pointsLate: q.points_late,
+    scheduleTime: q.schedule_time,
+    deadlineTime: q.deadline_time,
+    isSpecial: q.is_special,
+    specialStartAt: q.special_start_at,
+    specialWindowMinutes: q.special_window_minutes,
+  }));
+}
+
+export async function setQuestions(questions: Question[]): Promise<Question[]> {
+  const records = questions.map(q => ({
+    id: q.id,
+    campaign_id: q.campaignId,
+    day_index: q.dayIndex,
+    text: q.text,
+    choices: q.choices,
+    answer: q.answer,
+    status: q.status,
+    priority: q.priority,
+    points_on_time: q.pointsOnTime,
+    points_late: q.pointsLate,
+    schedule_time: q.scheduleTime,
+    deadline_time: q.deadlineTime,
+    is_special: q.isSpecial,
+    special_start_at: q.specialStartAt,
+    special_window_minutes: q.specialWindowMinutes,
+  }));
+  
+  const { error } = await supabase.from('questions').upsert(records);
+  if (error) console.error('Error setting questions:', error);
+  
+  return fetchQuestions();
+}
+
+export async function addQuestion(q: Omit<Question, 'id'>): Promise<Question> {
+  const { data, error } = await supabase
+    .from('questions')
+    .insert({
+      campaign_id: q.campaignId,
+      day_index: q.dayIndex,
+      text: q.text,
+      choices: q.choices,
+      answer: q.answer,
+      status: q.status,
+      priority: q.priority,
+      points_on_time: q.pointsOnTime,
+      points_late: q.pointsLate,
+      schedule_time: q.scheduleTime,
+      deadline_time: q.deadlineTime,
+      is_special: q.isSpecial,
+      special_start_at: q.specialStartAt,
+      special_window_minutes: q.specialWindowMinutes,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error adding question:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    campaignId: data.campaign_id,
+    dayIndex: data.day_index,
+    text: data.text,
+    choices: data.choices,
+    answer: data.answer,
+    status: data.status,
+    priority: data.priority,
+    pointsOnTime: data.points_on_time,
+    pointsLate: data.points_late,
+    scheduleTime: data.schedule_time,
+    deadlineTime: data.deadline_time,
+    isSpecial: data.is_special,
+    specialStartAt: data.special_start_at,
+    specialWindowMinutes: data.special_window_minutes,
+  };
+}
+
+export async function updateQuestion(updated: Question): Promise<Question> {
+  const { data, error } = await supabase
+    .from('questions')
+    .update({
+      campaign_id: updated.campaignId,
+      day_index: updated.dayIndex,
+      text: updated.text,
+      choices: updated.choices,
+      answer: updated.answer,
+      status: updated.status,
+      priority: updated.priority,
+      points_on_time: updated.pointsOnTime,
+      points_late: updated.pointsLate,
+      schedule_time: updated.scheduleTime,
+      deadline_time: updated.deadlineTime,
+      is_special: updated.isSpecial,
+      special_start_at: updated.specialStartAt,
+      special_window_minutes: updated.specialWindowMinutes,
+    })
+    .eq('id', updated.id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating question:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    campaignId: data.campaign_id,
+    dayIndex: data.day_index,
+    text: data.text,
+    choices: data.choices,
+    answer: data.answer,
+    status: data.status,
+    priority: data.priority,
+    pointsOnTime: data.points_on_time,
+    pointsLate: data.points_late,
+    scheduleTime: data.schedule_time,
+    deadlineTime: data.deadline_time,
+    isSpecial: data.is_special,
+    specialStartAt: data.special_start_at,
+    specialWindowMinutes: data.special_window_minutes,
+  };
+}
+
+export async function deleteQuestion(id: number): Promise<void> {
+  try {
+    // Delete answers for this question first
+    await supabase.from('answers').delete().eq('question_id', id);
+    
+    // Delete the question
+    const { error } = await supabase.from('questions').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting question:', error);
+      throw new Error(error.message);
+    }
+  } catch (error: any) {
+    console.error('Error in deleteQuestion:', error);
+    throw error;
+  }
+}
+
+// ============================================================================
+// TEAMS - Supabase CRUD
+// ============================================================================
+
+export async function fetchTeams(): Promise<Team[]> {
+  const { data, error } = await supabase
+    .from('teams')
+    .select('*, team_members(player_id)')
+    .order('id', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching teams:', error);
+    return [];
+  }
+  
+  return (data || []).map(t => ({
+    id: t.id,
+    campaignId: t.campaign_id,
+    name: t.name,
+    members: (t.team_members || []).map((tm: any) => tm.player_id),
+    totalScore: t.total_score,
+    createdAt: t.created_at,
+  }));
+}
+
+export async function setTeams(teams: Team[]): Promise<Team[]> {
+  const records = teams.map(t => ({
+    id: t.id,
+    campaign_id: t.campaignId,
+    name: t.name,
+    total_score: t.totalScore,
+  }));
+  
+  const { error } = await supabase.from('teams').upsert(records);
+  if (error) console.error('Error setting teams:', error);
+  
+  return fetchTeams();
+}
+
+export async function addTeam(t: Omit<Team, 'id'>): Promise<Team> {
+  const { data, error } = await supabase
+    .from('teams')
+    .insert({
+      campaign_id: t.campaignId,
+      name: t.name,
+      total_score: t.totalScore || 0,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error adding team:', error);
+    throw new Error(error.message);
+  }
+  
+  // Insert team_members relationships
+  if (t.members && t.members.length > 0) {
+    const memberships = t.members.map(playerId => ({
+      team_id: data.id,
+      player_id: playerId,
+    }));
+    await supabase.from('team_members').insert(memberships);
+  }
+  
+  return {
+    id: data.id,
+    campaignId: data.campaign_id,
+    name: data.name,
+    members: t.members || [],
+    totalScore: data.total_score,
+    createdAt: data.created_at,
+  };
+}
+
+export async function updateTeam(updated: Team): Promise<Team> {
+  const { data, error } = await supabase
+    .from('teams')
+    .update({
+      campaign_id: updated.campaignId,
+      name: updated.name,
+      total_score: updated.totalScore || 0,
+    })
+    .eq('id', updated.id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating team:', error);
+    throw new Error(error.message);
+  }
+  
+  // Update team_members relationships
+  await supabase.from('team_members').delete().eq('team_id', updated.id);
+  
+  if (updated.members && updated.members.length > 0) {
+    const memberships = updated.members.map(playerId => ({
+      team_id: updated.id,
+      player_id: playerId,
+    }));
+    await supabase.from('team_members').insert(memberships);
+  }
+  
+  return {
+    id: data.id,
+    campaignId: data.campaign_id,
+    name: data.name,
+    members: updated.members || [],
+    totalScore: data.total_score,
+    createdAt: data.created_at,
+  };
+}
+
+export async function deleteTeam(id: number): Promise<void> {
+  try {
+    // Delete team members first
+    await supabase.from('team_members').delete().eq('team_id', id);
+    
+    // Delete the team
+    const { error } = await supabase.from('teams').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting team:', error);
+      throw new Error(error.message);
+    }
+  } catch (error: any) {
+    console.error('Error in deleteTeam:', error);
+    throw error;
+  }
+}
+
+
+
+// ============================================================================
+// PRODUCTS - Supabase CRUD
+// ============================================================================
+
+export async function fetchProducts(): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .order('id', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching products:', error);
+    return [];
+  }
+  
+  return (data || []).map(p => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    imageUrl: p.image_url,
+    priceInGameCoins: p.price_in_game_coins,
+    quantity: p.quantity,
+    campaignId: p.campaign_id,
+    availableFrom: p.available_from,
+    availableUntil: p.available_until,
+    createdAt: p.created_at,
+  }));
+}
+
+export async function addProduct(p: Omit<Product, 'id' | 'createdAt'>): Promise<Product> {
+  const { data, error } = await supabase
+    .from('products')
+    .insert({
+      name: p.name,
+      description: p.description,
+      image_url: p.imageUrl,
+      price_in_game_coins: p.priceInGameCoins,
+      quantity: p.quantity,
+      campaign_id: p.campaignId,
+      available_from: p.availableFrom,
+      available_until: p.availableUntil,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error adding product:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    imageUrl: data.image_url,
+    priceInGameCoins: data.price_in_game_coins,
+    quantity: data.quantity,
+    campaignId: data.campaign_id,
+    availableFrom: data.available_from,
+    availableUntil: data.available_until,
+    createdAt: data.created_at,
+  };
+}
+
+export async function updateProduct(updated: Product): Promise<Product> {
+  const { data, error } = await supabase
+    .from('products')
+    .update({
+      name: updated.name,
+      description: updated.description,
+      image_url: updated.imageUrl,
+      price_in_game_coins: updated.priceInGameCoins,
+      quantity: updated.quantity,
+      campaign_id: updated.campaignId,
+      available_from: updated.availableFrom,
+      available_until: updated.availableUntil,
+    })
+    .eq('id', updated.id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating product:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    imageUrl: data.image_url,
+    priceInGameCoins: data.price_in_game_coins,
+    quantity: data.quantity,
+    campaignId: data.campaign_id,
+    availableFrom: data.available_from,
+    availableUntil: data.available_until,
+    createdAt: data.created_at,
+  };
+}
+
+export async function deleteProduct(id: number): Promise<void> {
+  const { error } = await supabase.from('products').delete().eq('id', id);
+  if (error) {
+    console.error('Error deleting product:', error);
+    throw new Error(error.message);
+  }
+}
+
+// ============================================================================
+// PURCHASES - Supabase CRUD
+// ============================================================================
+
+export async function fetchPurchases(): Promise<Purchase[]> {
+  const { data, error } = await supabase
+    .from('purchases')
+    .select('*')
+    .order('purchased_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching purchases:', error);
+    return [];
+  }
+  
+  return (data || []).map(p => ({
+    id: p.id,
+    playerId: p.player_id,
+    productId: p.product_id,
+    campaignId: p.campaign_id,
+    purchasedAt: p.purchased_at,
+    priceInGameCoins: p.price_in_game_coins,
+  }));
+}
+
+export async function addPurchase(p: Omit<Purchase, 'id' | 'purchasedAt'>): Promise<Purchase> {
+  // Use RPC function for atomic purchase
+  const { data, error } = await supabase.rpc('purchase_product', {
+    p_player_id: p.playerId,
+    p_product_id: p.productId,
+    p_campaign_id: p.campaignId,
+  }).single();
+  
+  if (error) {
+    console.error('Error making purchase:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    playerId: data.player_id,
+    productId: data.product_id,
+    campaignId: data.campaign_id,
+    purchasedAt: data.purchased_at,
+    priceInGameCoins: data.price_in_game_coins,
+  };
+}
+
+// ============================================================================
+// ANSWERS - Supabase CRUD
+// ============================================================================
+
 export async function fetchAnswers(): Promise<Answer[]> {
-  return Promise.resolve(read<Answer[]>('gd_answers', []));
+  const { data, error } = await supabase
+    .from('answers')
+    .select('*')
+    .order('answered_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching answers:', error);
+    return [];
+  }
+  
+  return (data || []).map(a => ({
+    id: a.id,
+    playerId: a.player_id,
+    questionId: a.question_id,
+    campaignId: a.campaign_id,
+    answeredAt: a.answered_at,
+    selectedAnswer: a.selected_answer,
+    pointsEarned: a.points_earned,
+    isOnTime: a.is_on_time,
+    isCorrect: a.is_correct,
+  }));
 }
 
 export async function addAnswer(a: Omit<Answer, 'id'>): Promise<Answer> {
-  const list = read<Answer[]>('gd_answers', []);
-  const id = Math.max(0, ...list.map(x => x.id)) + 1;
-  const next: Answer = { id, ...a } as Answer;
-  list.push(next);
-  write('gd_answers', list);
-  return Promise.resolve(next);
+  const { data, error } = await supabase
+    .from('answers')
+    .insert({
+      player_id: a.playerId,
+      question_id: a.questionId,
+      campaign_id: a.campaignId,
+      answered_at: a.answeredAt,
+      selected_answer: a.selectedAnswer,
+      points_earned: a.pointsEarned,
+      is_on_time: a.isOnTime,
+      is_correct: a.isCorrect,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error adding answer:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    playerId: data.player_id,
+    questionId: data.question_id,
+    campaignId: data.campaign_id,
+    answeredAt: data.answered_at,
+    selectedAnswer: data.selected_answer,
+    pointsEarned: data.points_earned,
+    isOnTime: data.is_on_time,
+    isCorrect: data.is_correct,
+  };
 }
 
-// Add answer with validation: only one answer per player per question, compute points
-export async function submitAnswer(a: Omit<Answer, 'id' | 'answeredAt' | 'pointsEarned' | 'isOnTime'>): Promise<Answer> {
-  const allAnswers = read<Answer[]>('gd_answers', []);
-  // prevent duplicate answer by same player for same question
-  const already = allAnswers.find(x => x.playerId === a.playerId && x.questionId === a.questionId);
-  if (already) return Promise.reject(new Error('Player has already answered this question'));
-
-  // fetch question
-  const questions = read<Question[]>('gd_questions', []);
-  const question = questions.find(q => q.id === a.questionId);
-  if (!question) return Promise.reject(new Error('Question not found'));
-
-  const now = new Date();
-  const answeredAt = now.toISOString();
-
-  // compute onTime for special questions
-  let isOnTime = false;
-  let points = 0;
-
-  if (question.isSpecial && question.specialStartAt) {
-    const start = new Date(question.specialStartAt);
-    const windowMin = question.specialWindowMinutes ?? 1;
-    const end = new Date(start.getTime() + windowMin * 60 * 1000);
-    if (now >= start && now <= end) {
-      isOnTime = true;
-    } else {
-      isOnTime = false;
-    }
-  } else {
-    // regular question: determine the date for this question based on campaign start + dayIndex
-    const campaigns = read<Campaign[]>('gd_campaigns', []);
-    const campaign = campaigns.find(c => c.id === question.campaignId);
-    if (!campaign) return Promise.reject(new Error('Campaign not found'));
-    const campaignStart = new Date(campaign.startDate);
-    const questionDate = new Date(campaignStart.getTime() + question.dayIndex * 24 * 60 * 60 * 1000);
-
-    // build opening and closing datetimes using scheduleTime and deadlineTime
-    const scheduleParts = (question.scheduleTime || '08:00').split(':').map(Number);
-    const deadlineParts = (question.deadlineTime || '18:00').split(':').map(Number);
-    const openAt = new Date(questionDate);
-    openAt.setHours(scheduleParts[0] ?? 8, scheduleParts[1] ?? 0, 0, 0);
-    const closeAt = new Date(questionDate);
-    closeAt.setHours(deadlineParts[0] ?? 18, deadlineParts[1] ?? 0, 0, 0);
-
-    if (now >= openAt && now <= closeAt) {
-      isOnTime = true;
-    } else {
-      isOnTime = false;
-    }
+// Submit answer using RPC for atomic operation
+export async function submitAnswer(a: Omit<Answer, 'id' | 'answeredAt' | 'pointsEarned' | 'isOnTime' | 'isCorrect'>): Promise<Answer> {
+  const { data, error } = await supabase.rpc('submit_answer', {
+    p_player_id: a.playerId,
+    p_question_id: a.questionId,
+    p_campaign_id: a.campaignId,
+    p_selected_answer: a.selectedAnswer,
+  }).single();
+  
+  if (error) {
+    console.error('Error submitting answer:', error);
+    throw new Error(error.message);
   }
-
-  // determine correctness and points (wrong answers also receive points according to rules)
-  const isCorrect = a.selectedAnswer === question.answer;
-  if (isCorrect) {
-    // correct points come from question's configured values
-    points = isOnTime ? (question.pointsOnTime ?? 0) : (question.pointsLate ?? 0);
-  } else {
-    // wrong answer points per your rules
-    if (question.isSpecial) {
-      points = isOnTime ? 600 : 300;
-    } else {
-      points = isOnTime ? 300 : 150;
-    }
-  }
-
-  // persist answer
-  const id = Math.max(0, ...allAnswers.map(x => x.id)) + 1;
-  const next: Answer = { id, ...a, answeredAt, pointsEarned: points, isOnTime, isCorrect } as Answer;
-  allAnswers.push(next);
-  write('gd_answers', allAnswers);
-
-  // update player's score and gameCoins
-  const players = read<Player[]>('gd_players', []);
-  const player = players.find(p => p.id === a.playerId);
-  if (player) {
-    player.score = (player.score || 0) + points;
-    player.gameCoins = (player.gameCoins || 0) + points; // 1 point = 1 gamecoin
-    // update campaignScores
-    player.campaignScores = player.campaignScores || {};
-    player.campaignScores[a.campaignId] = (player.campaignScores[a.campaignId] || 0) + points;
-    write('gd_players', players);
-  }
-
-  return Promise.resolve(next);
+  
+  return {
+    id: data.id,
+    playerId: data.player_id,
+    questionId: data.question_id,
+    campaignId: data.campaign_id,
+    answeredAt: data.answered_at,
+    selectedAnswer: data.selected_answer,
+    pointsEarned: data.points_earned,
+    isOnTime: data.is_on_time,
+    isCorrect: data.is_correct,
+  };
 }
 
 export async function getPlayerAnswersForCampaign(playerId: number, campaignId: number): Promise<Answer[]> {
-  const all = read<Answer[]>('gd_answers', []);
-  return Promise.resolve(all.filter(a => a.playerId === playerId && a.campaignId === campaignId));
+  const { data, error} = await supabase
+    .from('answers')
+    .select('*')
+    .eq('player_id', playerId)
+    .eq('campaign_id', campaignId)
+    .order('answered_at', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching player answers:', error);
+    return [];
+  }
+  
+  return (data || []).map(a => ({
+    id: a.id,
+    playerId: a.player_id,
+    questionId: a.question_id,
+    campaignId: a.campaign_id,
+    answeredAt: a.answered_at,
+    selectedAnswer: a.selected_answer,
+    pointsEarned: a.points_earned,
+    isOnTime: a.is_on_time,
+    isCorrect: a.is_correct,
+  }));
 }
 
-// Return visible questions for a player in a campaign.
-// Rules:
-// - One regular question per day: the earliest unanswered question with dayIndex <= todayIndex
-// - Special questions are visible when their specialStartAt <= now (and unanswered)
 export async function getVisibleQuestionsForPlayer(playerId: number, campaignId: number): Promise<Question[]> {
-  const questions = read<Question[]>('gd_questions', []).filter(q => q.campaignId === campaignId);
-  const answers = read<Answer[]>('gd_answers', []).filter(a => a.playerId === playerId && a.campaignId === campaignId);
-  const campaigns = read<Campaign[]>('gd_campaigns', []);
+  const questions = await fetchQuestions();
+  const campaignQuestions = questions.filter(q => q.campaignId === campaignId);
+  const answers = await getPlayerAnswersForCampaign(playerId, campaignId);
+  const campaigns = await fetchCampaigns();
   const campaign = campaigns.find(c => c.id === campaignId);
-  if (!campaign) return Promise.resolve([]);
+  
+  if (!campaign) return [];
 
   const now = new Date();
   const campaignStart = new Date(campaign.startDate);
   const dayIndexNow = Math.floor((now.getTime() - campaignStart.getTime()) / (24 * 60 * 60 * 1000));
 
   // regular questions: earliest unanswered with dayIndex <= dayIndexNow
-  const regularCandidates = questions.filter(q => !q.isSpecial).sort((a, b) => a.dayIndex - b.dayIndex);
+  const regularCandidates = campaignQuestions.filter(q => !q.isSpecial).sort((a, b) => a.dayIndex - b.dayIndex);
   let visibleRegular: Question | null = null;
   for (const q of regularCandidates) {
     if (q.dayIndex <= dayIndexNow) {
@@ -365,7 +965,7 @@ export async function getVisibleQuestionsForPlayer(playerId: number, campaignId:
   }
 
   // special questions: those with specialStartAt <= now and unanswered
-  const specialVisible = questions.filter(q => q.isSpecial && q.specialStartAt).filter(q => {
+  const specialVisible = campaignQuestions.filter(q => q.isSpecial && q.specialStartAt).filter(q => {
     const start = new Date(q.specialStartAt!);
     return start <= now && !answers.find(a => a.questionId === q.id);
   });
@@ -373,50 +973,52 @@ export async function getVisibleQuestionsForPlayer(playerId: number, campaignId:
   const result: Question[] = [];
   if (visibleRegular) result.push(visibleRegular);
   if (specialVisible.length) result.push(...specialVisible);
-  return Promise.resolve(result);
+  return result;
 }
 
-// Admins
+// ============================================================================
+// ADMINS - Supabase CRUD (Read-only for now, managed via scripts)
+// ============================================================================
+
 export interface Admin {
   id: number;
   name: string;
   email: string;
-  invited?: boolean; // true when invitation sent but not yet activated
-  inviteToken?: string; // token used in invite acceptance link
+  invited?: boolean;
+  inviteToken?: string;
   createdAt: string;
+  authUid?: string;
 }
 
 export async function fetchAdmins(): Promise<Admin[]> {
-  return Promise.resolve(read<Admin[]>('gd_admins', []));
+  const { data, error } = await supabase
+    .from('admins')
+    .select('*')
+    .order('id', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching admins:', error);
+    return [];
+  }
+  
+  return (data || []).map(a => ({
+    id: a.id,
+    name: a.name,
+    email: a.email,
+    invited: a.invited,
+    inviteToken: a.invite_token,
+    createdAt: a.created_at,
+    authUid: a.auth_uid,
+  }));
 }
 
-export async function addAdmin(a: Omit<Admin, 'id' | 'createdAt'>): Promise<Admin> {
-  const list = read<Admin[]>('gd_admins', []);
-  const id = Math.max(0, ...list.map(x => x.id)) + 1;
-  const next: Admin = { id, ...a, createdAt: new Date().toISOString() } as Admin;
-  list.push(next);
-  write('gd_admins', list);
-  return Promise.resolve(next);
-}
+// ============================================================================
+// MESSAGES - Supabase CRUD
+// ============================================================================
 
-export async function updateAdmin(updated: Admin): Promise<Admin> {
-  const list = read<Admin[]>('gd_admins', []);
-  const next = list.map(a => a.id === updated.id ? updated : a);
-  write('gd_admins', next);
-  return Promise.resolve(updated);
-}
-
-export async function deleteAdmin(id: number): Promise<void> {
-  const list = read<Admin[]>('gd_admins', []);
-  const next = list.filter(a => a.id !== id);
-  write('gd_admins', next);
-  return Promise.resolve();
-}
-
-// Messages (reports from players / other platforms)
 export interface MessageItem {
   id: number;
-  from: string; // player email or source
+  from: string;
   subject: string;
   body: string;
   receivedAt: string;
@@ -424,107 +1026,206 @@ export interface MessageItem {
 }
 
 export async function fetchMessages(): Promise<MessageItem[]> {
-  return Promise.resolve(read<MessageItem[]>('gd_messages', []));
-}
-
-export async function addMessage(m: Omit<MessageItem, 'id' | 'receivedAt'>): Promise<MessageItem> {
-  const list = read<MessageItem[]>('gd_messages', []);
-  const id = Math.max(0, ...list.map(x => x.id)) + 1;
-  const next: MessageItem = { id, ...m, receivedAt: new Date().toISOString() } as MessageItem;
-  list.push(next);
-  write('gd_messages', list);
-  return Promise.resolve(next);
-}
-
-export async function updateMessage(updated: MessageItem): Promise<MessageItem> {
-  const list = read<MessageItem[]>('gd_messages', []);
-  const next = list.map(m => m.id === updated.id ? updated : m);
-  write('gd_messages', next);
-  return Promise.resolve(updated);
-}
-
-export async function deleteMessage(id: number): Promise<void> {
-  const list = read<MessageItem[]>('gd_messages', []);
-  const next = list.filter(m => m.id !== id);
-  write('gd_messages', next);
-  return Promise.resolve();
-}
-
-// Products
-export async function fetchProducts(): Promise<Product[]> {
-  return Promise.resolve(read<Product[]>('gd_products', []));
-}
-
-export async function addProduct(p: Omit<Product, 'id' | 'createdAt'>): Promise<Product> {
-  const list = read<Product[]>('gd_products', []);
-  const id = Math.max(0, ...list.map(x => x.id)) + 1;
-  const next: Product = { id, ...p, createdAt: new Date().toISOString() } as Product;
-  list.push(next);
-  write('gd_products', list);
-  return Promise.resolve(next);
-}
-
-export async function updateProduct(updated: Product): Promise<Product> {
-  const list = read<Product[]>('gd_products', []);
-  const next = list.map(p => p.id === updated.id ? updated : p);
-  write('gd_products', next);
-  return Promise.resolve(updated);
-}
-
-export async function deleteProduct(id: number): Promise<void> {
-  const list = read<Product[]>('gd_products', []);
-  const next = list.filter(p => p.id !== id);
-  write('gd_products', next);
-  return Promise.resolve();
-}
-
-// Purchases
-export async function fetchPurchases(): Promise<Purchase[]> {
-  return Promise.resolve(read<Purchase[]>('gd_purchases', []));
-}
-
-export async function addPurchase(p: Omit<Purchase, 'id' | 'purchasedAt'>): Promise<Purchase> {
-  const list = read<Purchase[]>('gd_purchases', []);
-  // prevent duplicate purchase of same product by same player
-  const already = list.find(x => x.playerId === p.playerId && x.productId === p.productId);
-  if (already) return Promise.reject(new Error('Player has already purchased this product'));
-
-  // check player has enough gameCoins
-  const players = read<Player[]>('gd_players', []);
-  const player = players.find(pl => pl.id === p.playerId);
-  if (!player) return Promise.reject(new Error('Player not found'));
-
-  const products = read<Product[]>('gd_products', []);
-  const product = products.find(pr => pr.id === p.productId);
-  if (!product) return Promise.reject(new Error('Product not found'));
-
-  const purchasedCount = list.filter(x => x.productId === p.productId).length;
-  const remaining = product.quantity - purchasedCount;
-  if (remaining <= 0) return Promise.reject(new Error('Product out of stock'));
-
-  if ((player.gameCoins || 0) < p.priceInGameCoins) return Promise.reject(new Error('Insufficient gameCoins'));
-
-  // create purchase
-  const id = Math.max(0, ...list.map(x => x.id)) + 1;
-  const next: Purchase = { id, ...p, purchasedAt: new Date().toISOString() } as Purchase;
-  list.push(next);
-  write('gd_purchases', list);
-
-  // deduct coins
-  player.gameCoins = (player.gameCoins || 0) - p.priceInGameCoins;
-  write('gd_players', players);
-
-  return Promise.resolve(next);
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .order('received_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching messages:', error);
+    return [];
+  }
+  
+  return (data || []).map(m => ({
+    id: m.id,
+    from: m.from,
+    subject: m.subject,
+    body: m.body,
+    receivedAt: m.received_at,
+    handled: m.handled,
+  }));
 }
 
 export async function getPlayerPurchases(playerId: number): Promise<Purchase[]> {
-  const all = read<Purchase[]>('gd_purchases', []);
-  return Promise.resolve(all.filter(p => p.playerId === playerId));
+  const { data, error } = await supabase
+    .from('purchases')
+    .select('*')
+    .eq('player_id', playerId)
+    .order('purchased_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching player purchases:', error);
+    return [];
+  }
+  
+  return (data || []).map(p => ({
+    id: p.id,
+    playerId: p.player_id,
+    productId: p.product_id,
+    campaignId: p.campaign_id,
+    purchasedAt: p.purchased_at,
+    priceInGameCoins: p.price_in_game_coins,
+  }));
 }
 
 export async function getProductPurchases(productId: number): Promise<Purchase[]> {
-  const all = read<Purchase[]>('gd_purchases', []);
-  return Promise.resolve(all.filter(p => p.productId === productId));
+  const { data, error } = await supabase
+    .from('purchases')
+    .select('*')
+    .eq('product_id', productId)
+    .order('purchased_at', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching product purchases:', error);
+    return [];
+  }
+  
+  return (data || []).map(p => ({
+    id: p.id,
+    playerId: p.player_id,
+    productId: p.product_id,
+    campaignId: p.campaign_id,
+    purchasedAt: p.purchased_at,
+    priceInGameCoins: p.price_in_game_coins,
+  }));
+}
+
+// ============================================================================
+// ADMINS - Supabase CRUD (Management functions)
+// ============================================================================
+
+export async function addAdmin(a: Omit<Admin, 'id' | 'createdAt'>): Promise<Admin> {
+  const { data, error } = await supabase
+    .from('admins')
+    .insert({
+      name: a.name,
+      email: a.email,
+      invited: a.invited,
+      invite_token: a.inviteToken,
+      auth_uid: a.authUid,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error adding admin:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    name: data.name,
+    email: data.email,
+    invited: data.invited,
+    inviteToken: data.invite_token,
+    createdAt: data.created_at,
+    authUid: data.auth_uid,
+  };
+}
+
+export async function updateAdmin(updated: Admin): Promise<Admin> {
+  const { data, error } = await supabase
+    .from('admins')
+    .update({
+      name: updated.name,
+      email: updated.email,
+      invited: updated.invited,
+      invite_token: updated.inviteToken,
+      auth_uid: updated.authUid,
+    })
+    .eq('id', updated.id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating admin:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    name: data.name,
+    email: data.email,
+    invited: data.invited,
+    inviteToken: data.invite_token,
+    createdAt: data.created_at,
+    authUid: data.auth_uid,
+  };
+}
+
+export async function deleteAdmin(id: number): Promise<void> {
+  const { error } = await supabase.from('admins').delete().eq('id', id);
+  if (error) {
+    console.error('Error deleting admin:', error);
+    throw new Error(error.message);
+  }
+}
+
+// ============================================================================
+// MESSAGES - Supabase CRUD (Management functions)
+// ============================================================================
+
+export async function addMessage(m: Omit<MessageItem, 'id' | 'receivedAt'>): Promise<MessageItem> {
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      from: m.from,
+      subject: m.subject,
+      body: m.body,
+      handled: m.handled,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error adding message:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    from: data.from,
+    subject: data.subject,
+    body: data.body,
+    receivedAt: data.received_at,
+    handled: data.handled,
+  };
+}
+
+export async function updateMessage(updated: MessageItem): Promise<MessageItem> {
+  const { data, error } = await supabase
+    .from('messages')
+    .update({
+      from: updated.from,
+      subject: updated.subject,
+      body: updated.body,
+      handled: updated.handled,
+    })
+    .eq('id', updated.id)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error updating message:', error);
+    throw new Error(error.message);
+  }
+  
+  return {
+    id: data.id,
+    from: data.from,
+    subject: data.subject,
+    body: data.body,
+    receivedAt: data.received_at,
+    handled: data.handled,
+  };
+}
+
+export async function deleteMessage(id: number): Promise<void> {
+  const { error } = await supabase.from('messages').delete().eq('id', id);
+  if (error) {
+    console.error('Error deleting message:', error);
+    throw new Error(error.message);
+  }
 }
 
 export default null;

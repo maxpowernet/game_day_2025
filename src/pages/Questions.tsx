@@ -85,18 +85,44 @@ const Questions = () => {
   });
 
   const addMutation = useMutation({
-    mutationFn: (q: Omit<Question, "id">) => apiAddQuestion(q),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["questions"] }),
+    mutationFn: async (q: Omit<Question, "id">) => {
+      console.log('Adding question:', q);
+      const result = await apiAddQuestion(q);
+      console.log('Question added:', result);
+      return result;
+    },
+    onSuccess: async () => {
+      console.log('Question added successfully, invalidating queries');
+      await queryClient.invalidateQueries({ queryKey: ["questions"] });
+      await queryClient.refetchQueries({ queryKey: ["questions"] });
+      toast({ title: 'Questão criada', description: 'A questão foi criada com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      console.error('Error adding question:', error);
+      toast({ title: 'Erro ao criar questão', description: error.message, variant: 'destructive' } as any);
+    }
   });
 
   const updateMutation = useMutation({
     mutationFn: (q: Question) => apiUpdateQuestion(q),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["questions"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["questions"] });
+      toast({ title: 'Questão atualizada', description: 'A questão foi atualizada com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao atualizar questão', description: error.message, variant: 'destructive' } as any);
+    }
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiDeleteQuestion(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["questions"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["questions"] });
+      toast({ title: 'Questão removida', description: 'A questão foi removida com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao remover questão', description: error.message, variant: 'destructive' } as any);
+    }
   });
 
   const openDialog = (q?: Question) => {

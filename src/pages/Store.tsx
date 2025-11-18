@@ -52,15 +52,35 @@ const Store = () => {
 
   const addMutation = useMutation({ 
     mutationFn: (p: Omit<Product, "id" | "createdAt">) => apiAddProduct(p), 
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }) 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast({ title: 'Produto criado', description: 'O produto foi criado com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao criar produto', description: error.message, variant: 'destructive' } as any);
+    }
   });
+  
   const updateMutation = useMutation({ 
     mutationFn: (p: Product) => apiUpdateProduct(p), 
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }) 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast({ title: 'Produto atualizado', description: 'O produto foi atualizado com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao atualizar produto', description: error.message, variant: 'destructive' } as any);
+    }
   });
+  
   const deleteMutation = useMutation({ 
     mutationFn: (id: number) => apiDeleteProduct(id), 
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }) 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast({ title: 'Produto removido', description: 'O produto foi removido com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao remover produto', description: error.message, variant: 'destructive' } as any);
+    }
   });
 
   const openDialog = (p?: Product) => {

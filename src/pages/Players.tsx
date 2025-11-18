@@ -60,12 +60,37 @@ const Players = () => {
   const { data: players = [] } = useQuery({ queryKey: ['players'], queryFn: fetchPlayers });
 
   const addMutation = useMutation({
-    mutationFn: (p: { name: string; role?: string }) => apiAddPlayer({ name: p.name, role: p.role || 'Jogador', task: '', status: 'Pendente', score: 0 } as any),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['players'] })
+    mutationFn: (p: { name: string; role?: string }) => apiAddPlayer({ name: p.name, role: p.role || 'Jogador', task: '', status: 'Pendente', score: 0, gameCoins: 0 } as any),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['players'] });
+      toast({ title: 'Jogador adicionado', description: 'O jogador foi adicionado com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao adicionar jogador', description: error.message, variant: 'destructive' } as any);
+    }
   });
 
-  const deleteMutation = useMutation({ mutationFn: (id: number) => apiDeletePlayer(id) as any, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['players'] }) });
-  const updateMutation = useMutation({ mutationFn: (p: Player) => apiUpdatePlayer(p) as any, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['players'] }) });
+  const deleteMutation = useMutation({ 
+    mutationFn: (id: number) => apiDeletePlayer(id) as any, 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['players'] });
+      toast({ title: 'Jogador removido', description: 'O jogador foi removido com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao remover jogador', description: error.message, variant: 'destructive' } as any);
+    }
+  });
+  
+  const updateMutation = useMutation({ 
+    mutationFn: (p: Player) => apiUpdatePlayer(p) as any, 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['players'] });
+      toast({ title: 'Jogador atualizado', description: 'O jogador foi atualizado com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao atualizar jogador', description: error.message, variant: 'destructive' } as any);
+    }
+  });
 
   const stats = {
     total: (players || []).length,

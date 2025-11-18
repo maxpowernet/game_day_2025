@@ -1,34 +1,74 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Eye, EyeOff } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 import logo from "@/assets/logo.png";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate login
-    setTimeout(() => {
+    
+    const formData = new FormData(e.target as HTMLFormElement);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    const { error } = await signIn(email, password);
+    
+    if (error) {
+      toast({
+        title: "Erro ao fazer login",
+        description: error.message,
+        variant: "destructive",
+      });
       setIsLoading(false);
+    } else {
+      toast({
+        title: "Login realizado com sucesso!",
+        description: "Redirecionando...",
+      });
       navigate("/game-day");
-    }, 1000);
+    }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate signup
-    setTimeout(() => {
+    
+    const formData = new FormData(e.target as HTMLFormElement);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    const fullName = formData.get('name') as string;
+
+    const { error } = await signUp(email, password, { full_name: fullName });
+    
+    if (error) {
+      toast({
+        title: "Erro ao criar conta",
+        description: error.message,
+        variant: "destructive",
+      });
       setIsLoading(false);
-      navigate("/game-day");
-    }, 1000);
+    } else {
+      toast({
+        title: "Conta criada com sucesso!",
+        description: "Verifique seu e-mail para confirmar a conta.",
+      });
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -75,23 +115,50 @@ const Login = () => {
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">E-mail ou Usuário</Label>
+                    <Label htmlFor="login-email">E-mail</Label>
                     <Input
                       id="login-email"
-                      type="text"
-                      placeholder="Digite seu e-mail ou usuário"
+                      name="email"
+                      type="email"
+                      placeholder="Digite seu e-mail"
+                      defaultValue={import.meta.env.DEV ? "max.eldon@gmail.com" : ""}
                       required
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="login-password">Senha</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      placeholder="Digite sua senha"
-                      required
-                    />
+                    <div className="relative">
+                      <Input
+                        id="login-password"
+                        name="password"
+                        type={showLoginPassword ? 'text' : 'password'}
+                        placeholder="Digite sua senha"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword(v => !v)}
+                        aria-label={showLoginPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground p-1 rounded hover:bg-muted/10 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      >
+                        {showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                   </div>
+                  {import.meta.env.DEV && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={(e) => {
+                        const form = e.currentTarget.closest('form') as HTMLFormElement;
+                        const passwordInput = form.querySelector<HTMLInputElement>('input[name="password"]');
+                        if (passwordInput) passwordInput.value = '123456';
+                      }}
+                    >
+                      Preencher credenciais de demonstração
+                    </Button>
+                  )}
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Entrando..." : "Entrar"}
                   </Button>
@@ -104,6 +171,7 @@ const Login = () => {
                     <Label htmlFor="signup-name">Nome Completo</Label>
                     <Input
                       id="signup-name"
+                      name="name"
                       type="text"
                       placeholder="Digite seu nome completo"
                       required
@@ -113,6 +181,7 @@ const Login = () => {
                     <Label htmlFor="signup-email">E-mail</Label>
                     <Input
                       id="signup-email"
+                      name="email"
                       type="email"
                       placeholder="Digite seu e-mail"
                       required
@@ -120,12 +189,23 @@ const Login = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Senha</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="Crie uma senha"
-                      required
-                    />
+                    <div className="relative">
+                      <Input
+                        id="signup-password"
+                        name="password"
+                        type={showSignupPassword ? 'text' : 'password'}
+                        placeholder="Crie uma senha"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSignupPassword(v => !v)}
+                        aria-label={showSignupPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground p-1 rounded hover:bg-muted/10 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      >
+                        {showSignupPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Criando conta..." : "Cadastrar"}

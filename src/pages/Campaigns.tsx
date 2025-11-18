@@ -32,9 +32,46 @@ const Campaigns = () => {
   const [editing, setEditing] = useState<Campaign | null>(null);
   const [form, setForm] = useState({ name: "", startDate: "", endDate: "", status: "planned" as "planned" | "in-progress" | "completed", playerIds: [] as number[] });
 
-  const addMutation = useMutation({ mutationFn: (c: Omit<Campaign, "id">) => apiAddCampaign(c), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["campaigns"] }) });
-  const updateMutation = useMutation({ mutationFn: (c: Campaign) => apiUpdateCampaign(c), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["campaigns"] }) });
-  const deleteMutation = useMutation({ mutationFn: (id: number) => apiDeleteCampaign(id), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["campaigns"] }) });
+  const addMutation = useMutation({ 
+    mutationFn: (c: Omit<Campaign, "id">) => apiAddCampaign(c), 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      toast({ title: 'Campanha criada', description: 'A campanha foi criada com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao criar campanha', description: error.message, variant: 'destructive' } as any);
+    }
+  });
+  
+  const updateMutation = useMutation({ 
+    mutationFn: (c: Campaign) => apiUpdateCampaign(c), 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      toast({ title: 'Campanha atualizada', description: 'A campanha foi atualizada com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao atualizar campanha', description: error.message, variant: 'destructive' } as any);
+    }
+  });
+  
+  const deleteMutation = useMutation({ 
+    mutationFn: async (id: number) => {
+      try {
+        await apiDeleteCampaign(id);
+      } catch (error: any) {
+        console.error('Delete error:', error);
+        throw error;
+      }
+    }, 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      toast({ title: 'Campanha removida', description: 'A campanha foi removida com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      console.error('Mutation error:', error);
+      toast({ title: 'Erro ao remover campanha', description: error?.message || 'Erro desconhecido', variant: 'destructive' } as any);
+    }
+  });
 
   const openDialog = (c?: Campaign) => {
     if (c) {
@@ -57,9 +94,7 @@ const Campaigns = () => {
 
   const handleConfirm = () => {
     if (!confirmData) return;
-    deleteMutation.mutate(confirmData.id, {
-      onSuccess: () => toast({ title: 'Campanha removida', description: 'A campanha foi removida com sucesso.' } as any)
-    });
+    deleteMutation.mutate(confirmData.id);
     setConfirmOpen(false);
     setConfirmData(null);
   };

@@ -18,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Users, Play, Plus, Trash2, Edit, UserPlus } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import Sidebar from '@/components/Sidebar';
 
@@ -25,6 +26,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchTeams,
   fetchPlayers,
+  fetchCampaigns,
   addTeam as apiAddTeam,
   updateTeam as apiUpdateTeam,
   deleteTeam as apiDeleteTeam,
@@ -40,19 +42,49 @@ const Teams = () => {
 
   const { data: teams = [] } = useQuery({ queryKey: ['teams'], queryFn: fetchTeams });
   const { data: players = [] } = useQuery({ queryKey: ['players'], queryFn: fetchPlayers });
+  const { data: campaigns = [] } = useQuery({ queryKey: ['campaigns'], queryFn: fetchCampaigns });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
 
-  const [form, setForm] = useState({ name: '', members: [] as number[] });
+  const [form, setForm] = useState({ name: '', members: [] as number[], campaignId: 0 });
 
-  const addMutation = useMutation({ mutationFn: (t: Omit<Team, 'id'>) => apiAddTeam(t), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['teams'] }) });
-  const updateMutation = useMutation({ mutationFn: (t: Team) => apiUpdateTeam(t), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['teams'] }) });
-  const deleteMutation = useMutation({ mutationFn: (id: number) => apiDeleteTeam(id), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['teams'] }) });
+  const addMutation = useMutation({ 
+    mutationFn: (t: Omit<Team, 'id'>) => apiAddTeam(t), 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      toast({ title: 'Equipe criada', description: 'A equipe foi criada com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao criar equipe', description: error.message, variant: 'destructive' } as any);
+    }
+  });
+  
+  const updateMutation = useMutation({ 
+    mutationFn: (t: Team) => apiUpdateTeam(t), 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      toast({ title: 'Equipe atualizada', description: 'A equipe foi atualizada com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao atualizar equipe', description: error.message, variant: 'destructive' } as any);
+    }
+  });
+  
+  const deleteMutation = useMutation({ 
+    mutationFn: (id: number) => apiDeleteTeam(id), 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      toast({ title: 'Equipe removida', description: 'A equipe foi removida com sucesso.' } as any);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Erro ao remover equipe', description: error.message, variant: 'destructive' } as any);
+    }
+  });
 
   const openDialog = (team?: Team) => {
-    if (team) setEditingTeam(team), setForm({ name: team.name, members: team.members || [] });
-    else setEditingTeam(null), setForm({ name: '', members: [] });
+    if (team) setEditingTeam(team), setForm({ name: team.name, members: team.members || [], campaignId: team.campaignId });
+    else setEditingTeam(null), setForm({ name: '', members: [], campaignId: 0 });
     setIsDialogOpen(true);
   };
 
@@ -66,16 +98,15 @@ const Teams = () => {
 
   const handleConfirm = () => {
     if (!confirmData) return;
-    deleteMutation.mutate(confirmData.id, {
-      onSuccess: () => toast({ title: 'Equipe removida', description: 'A equipe foi removida com sucesso.' } as any)
-    });
+    deleteMutation.mutate(confirmData.id);
     setConfirmOpen(false);
     setConfirmData(null);
   };
 
   const saveTeam = () => {
     if (!form.name) return toast({ title: 'Erro', description: 'Preencha o nome da equipe', variant: 'destructive' } as any);
-    const payload = { name: form.name, members: form.members, createdAt: new Date().toISOString() } as any;
+    if (!form.campaignId) return toast({ title: 'Erro', description: 'Selecione uma campanha', variant: 'destructive' } as any);
+    const payload = { name: form.name, members: form.members, campaignId: form.campaignId, createdAt: new Date().toISOString(), totalScore: 0 } as any;
     if (editingTeam) updateMutation.mutate({ ...editingTeam, ...payload }); else addMutation.mutate(payload);
     setIsDialogOpen(false);
   };
@@ -165,6 +196,19 @@ const Teams = () => {
           <DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
             <DialogHeader><DialogTitle>{editingTeam ? 'Editar Equipe' : 'Nova Equipe'}</DialogTitle></DialogHeader>
             <div className='space-y-4 py-4'>
+              <div className='space-y-2'>
+                <Label>Campanha</Label>
+                <Select value={String(form.campaignId)} onValueChange={(v) => setForm({ ...form, campaignId: Number(v) })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder='Selecione uma campanha' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {campaigns.map((c: any) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className='space-y-2'><Label>Nome da Equipe</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder='Ex: Equipe Alpha' /></div>
               <div className='space-y-2'>
                 <Label>Membros (Jogadores)</Label>
