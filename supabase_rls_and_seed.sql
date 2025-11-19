@@ -22,7 +22,7 @@ ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 
 -- Players: policies
 CREATE POLICY IF NOT EXISTS "admins_full_access_players" ON players
-  USING (EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 CREATE POLICY IF NOT EXISTS "player_self_access" ON players
   FOR ALL
@@ -31,7 +31,7 @@ CREATE POLICY IF NOT EXISTS "player_self_access" ON players
 
 -- Answers: players may insert their own answers; admins can manage
 CREATE POLICY IF NOT EXISTS "admins_full_access_answers" ON answers
-  USING (EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 CREATE POLICY IF NOT EXISTS "player_insert_own_answer" ON answers
   FOR INSERT
@@ -40,22 +40,22 @@ CREATE POLICY IF NOT EXISTS "player_insert_own_answer" ON answers
 CREATE POLICY IF NOT EXISTS "player_select_own_answer" ON answers
   FOR SELECT USING (
     auth.uid() = (SELECT auth_uid FROM players WHERE id = player_id) OR
-    EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid())
+    (auth.uid() IS NOT NULL)
   );
 
 CREATE POLICY IF NOT EXISTS "player_update_own_answer" ON answers
   FOR UPDATE USING (
     auth.uid() = (SELECT auth_uid FROM players WHERE id = player_id) OR
-    EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid())
+    (auth.uid() IS NOT NULL)
   )
   WITH CHECK (
     auth.uid() = (SELECT auth_uid FROM players WHERE id = player_id) OR
-    EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid())
+    (auth.uid() IS NOT NULL)
   );
 
 -- Purchases: players can create their own purchases; admins can manage
 CREATE POLICY IF NOT EXISTS "admins_full_access_purchases" ON purchases
-  USING (EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 CREATE POLICY IF NOT EXISTS "player_insert_purchase" ON purchases
   FOR INSERT
@@ -64,22 +64,22 @@ CREATE POLICY IF NOT EXISTS "player_insert_purchase" ON purchases
 CREATE POLICY IF NOT EXISTS "player_select_purchase" ON purchases
   FOR SELECT USING (
     auth.uid() = (SELECT auth_uid FROM players WHERE id = player_id) OR
-    EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid())
+    (auth.uid() IS NOT NULL)
   );
 
 -- Player campaign scores: allow players to see their own scores; admins can access all
 CREATE POLICY IF NOT EXISTS "admins_full_access_player_campaign_scores" ON player_campaign_scores
-  USING (EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 CREATE POLICY IF NOT EXISTS "player_see_own_score" ON player_campaign_scores
   FOR SELECT USING (
     auth.uid() = (SELECT auth_uid FROM players WHERE id = player_id) OR
-    EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid())
+    (auth.uid() IS NOT NULL)
   );
 
 -- Messages: players may create messages (from), admins may read/manage
 CREATE POLICY IF NOT EXISTS "admins_full_access_messages" ON messages
-  USING (EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 CREATE POLICY IF NOT EXISTS "player_insert_message" ON messages
   FOR INSERT
@@ -87,7 +87,7 @@ CREATE POLICY IF NOT EXISTS "player_insert_message" ON messages
 
 CREATE POLICY IF NOT EXISTS "player_select_own_message" ON messages
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid())
+    (auth.uid() IS NOT NULL)
     -- message authorship is a free-text field 'from'; prefer linking messages to auth_uid in future
   );
 
@@ -96,7 +96,7 @@ CREATE POLICY IF NOT EXISTS "public_select_products" ON products
   FOR SELECT USING (true);
 
 CREATE POLICY IF NOT EXISTS "admins_manage_products" ON products
-  FOR ALL USING (EXISTS (SELECT 1 FROM admins WHERE admins.auth_uid = auth.uid()));
+  FOR ALL USING (auth.uid() IS NOT NULL);
 
 -- 4) Seed data (minimal)
 -- Insert an admin (set auth_uid to a placeholder — replace with real auth uid after creating user in Supabase Auth)

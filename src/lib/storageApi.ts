@@ -127,15 +127,25 @@ export async function setPlayers(players: Player[]): Promise<Player[]> {
     score: p.score || 0,
     game_coins: p.gameCoins || 0,
     team_id: p.teamId,
+    auth_uid: p.authUid,
   }));
-  
+
   const { error } = await supabase.from('players').upsert(records);
   if (error) console.error('Error setting players:', error);
-  
+
   return fetchPlayers();
 }
 
 export async function addPlayer(p: Omit<Player, 'id'>): Promise<Player> {
+  // try to attach the current authenticated user's UID when available
+  let authUid: string | null = null;
+  try {
+    const userRes = await supabase.auth.getUser();
+    authUid = (userRes?.data as any)?.user?.id ?? null;
+  } catch (e) {
+    // ignore - user may be unauthenticated
+  }
+
   const { data, error } = await supabase
     .from('players')
     .insert({
@@ -146,6 +156,7 @@ export async function addPlayer(p: Omit<Player, 'id'>): Promise<Player> {
       score: p.score || 0,
       game_coins: p.gameCoins || 0,
       team_id: p.teamId,
+      auth_uid: authUid,
     })
     .select()
     .single();
@@ -164,6 +175,7 @@ export async function addPlayer(p: Omit<Player, 'id'>): Promise<Player> {
     score: data.score || 0,
     gameCoins: data.game_coins || 0,
     teamId: data.team_id,
+    authUid: data.auth_uid,
   };
 }
 
@@ -178,6 +190,7 @@ export async function updatePlayer(updated: Player): Promise<Player> {
       score: updated.score || 0,
       game_coins: updated.gameCoins || 0,
       team_id: updated.teamId,
+      auth_uid: updated.authUid,
     })
     .eq('id', updated.id)
     .select()
@@ -197,6 +210,7 @@ export async function updatePlayer(updated: Player): Promise<Player> {
     score: data.score || 0,
     gameCoins: data.game_coins || 0,
     teamId: data.team_id,
+    authUid: data.auth_uid,
   };
 }
 
@@ -264,14 +278,19 @@ export async function setCampaigns(campaigns: Campaign[]): Promise<Campaign[]> {
   return fetchCampaigns();
 }
 
+function parseDate(dateStr: string): string {
+  const [day, month, year] = dateStr.split('/');
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
 export async function addCampaign(c: Omit<Campaign, 'id'>): Promise<Campaign> {
   const { data, error } = await supabase
     .from('campaigns')
     .insert({
       name: c.name,
       status: c.status,
-      start_date: c.startDate,
-      end_date: c.endDate,
+      start_date: parseDate(c.startDate),
+      end_date: parseDate(c.endDate),
       icon: c.icon,
     })
     .select()

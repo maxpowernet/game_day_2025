@@ -142,24 +142,53 @@ const Calendar = () => {
     const userEvents = events.filter(event => event.day === day);
     
     // Add campaign events for days within campaign date range
+    // Compute displayed month bounds
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = getDaysInMonth(currentDate);
+    const displayedStart = new Date(year, month, 1);
+    const displayedEnd = new Date(year, month, daysInMonth, 23, 59, 59, 999);
+
+    // Helper: parse date-only strings (YYYY-MM-DD) as local dates to avoid timezone shifts
+    const parseLocalDate = (v: any) => {
+      if (!v) return null;
+      // If already a Date
+      if (v instanceof Date) return v;
+      // If contains 'T' or timezone info, let Date parse it
+      if (typeof v === 'string' && v.includes('T')) return new Date(v);
+      // If string like 'YYYY-MM-DD', parse parts as local date
+      if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+        const [y, m, d] = v.split('-').map(Number);
+        return new Date(y, m - 1, d);
+      }
+      // Fallback
+      return new Date(v);
+    };
+
     const campaignEvents = campaigns
-      .filter((c: any) => {
-        const start = new Date(c.startDate);
-        const end = new Date(c.endDate);
-        const currentDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-        return currentDay >= start && currentDay <= end &&
-               start.getMonth() === currentDate.getMonth() && start.getFullYear() === currentDate.getFullYear() ||
-               end.getMonth() === currentDate.getMonth() && end.getFullYear() === currentDate.getFullYear() ||
-               (currentDay.getMonth() === currentDate.getMonth() && currentDay.getFullYear() === currentDate.getFullYear() &&
-                start <= currentDay && end >= currentDay);
+      .map((c: any) => {
+        const start = parseLocalDate(c.startDate);
+        const end = parseLocalDate(c.endDate);
+        return { raw: c, start, end };
       })
-      .map((c: any) => ({
-        id: `campaign-${c.id}-${day}`,
-        name: c.name,
-        color: c.status === 'completed' ? 'bg-green-600' : c.status === 'in-progress' ? 'bg-blue-600' : 'bg-purple-600',
+      .filter(({ start, end }) => {
+        if (!start || !end) return false;
+        // campaign entirely before or after displayed month -> skip
+        if (end < displayedStart) return false;
+        if (start > displayedEnd) return false;
+        return true;
+      })
+      .filter(({ raw, start, end }) => {
+        const currentDay = new Date(year, month, day);
+        return start && end && currentDay >= start && currentDay <= end;
+      })
+      .map(({ raw }) => ({
+        id: `campaign-${raw.id}-${day}`,
+        name: raw.name,
+        color: raw.status === 'completed' ? 'bg-green-600' : raw.status === 'in-progress' ? 'bg-blue-600' : 'bg-purple-600',
         day,
         icon: 'flag',
-        completed: c.status === 'completed',
+        completed: raw.status === 'completed',
         isCampaign: true,
       }));
 

@@ -232,6 +232,74 @@ npm i
 npm run dev
 ```
 
+### Local invite server (development)
+
+O projeto inclui um servidor local de convites para desenvolvimento que cria usuários confirmados no Supabase e envia emails via SMTP.
+
+**Início rápido:**
+
+```powershell
+# Executar o script helper (já configurado com suas credenciais)
+.\scripts\start-invite-server.ps1
+```
+
+O servidor iniciará em `http://localhost:3002/send-invite` e:
+- Criará usuários confirmados via Supabase Admin API (usando service role key)
+- Upsertará a linha na tabela `admins` com o token de convite
+- Enviará email via SMTP (Gmail) se as credenciais estiverem configuradas
+
+**Configuração manual (opcional):**
+
+Se preferir configurar manualmente ou usar outras credenciais, defina as variáveis de ambiente:
+
+```powershell
+$env:SUPABASE_URL='https://vhphsaodwurjnwrnxflm.supabase.co'
+$env:SUPABASE_SERVICE_ROLE_KEY='<sua-service-role-key>'
+$env:SMTP_HOST='smtp.gmail.com'
+$env:SMTP_PORT='587'
+$env:SMTP_USER='seu-email@gmail.com'
+$env:SMTP_PASS='sua-senha-ou-app-password'
+$env:SMTP_FROM='Game Day <seu-email@gmail.com>'
+$env:PORT='3002'
+node server/send-invite-server.js
+```
+
+**Uso na interface:**
+
+1. Inicie o servidor de convites (comando acima)
+2. Inicie o frontend: `npm run dev`
+3. Acesse `http://localhost:8080`
+4. Vá para **Configurações → Administradores**
+5. Preencha nome e email e clique em **Enviar Convite**
+6. A UI tentará usar o servidor local (porta 3002):
+   - ✅ Se SMTP configurado: email enviado + usuário criado
+   - ⚠️ Se SMTP não configurado: apenas usuário criado (link copiável)
+   - ❌ Se servidor offline: fallback para armazenamento local
+
+**⚠️ Importante - Gmail:**
+
+Gmail bloqueia login com usuário/senha simples. Para enviar emails via Gmail:
+- Ative a verificação em duas etapas na sua Conta Google
+- Gere uma **Senha de app** em: Conta Google → Segurança → Senhas de app
+- Use a senha de app (16 caracteres) em `$env:SMTP_PASS`
+
+**Alternativa recomendada (desenvolvimento):**
+
+Use [Mailtrap](https://mailtrap.io/) (grátis) para testar envio de emails sem configurar Gmail:
+```powershell
+$env:SMTP_HOST='sandbox.smtp.mailtrap.io'
+$env:SMTP_PORT='2525'
+$env:SMTP_USER='<seu-mailtrap-user>'
+$env:SMTP_PASS='<seu-mailtrap-pass>'
+```
+
+**Segurança:**
+
+- O servidor local é **apenas para desenvolvimento**
+- Não exponha a Service Role Key publicamente
+- Não commite o script `start-invite-server.ps1` com credenciais reais (use `.env` ou variáveis locais)
+
+
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).

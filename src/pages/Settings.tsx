@@ -43,13 +43,56 @@ const Settings = () => {
 
   const generateToken = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 
-  const sendInvite = () => {
+  const sendInvite = async () => {
     if (!inviteEmail || !inviteName) return toast({ title: 'Erro', description: 'Preencha nome e email', variant: 'destructive' } as any);
     const token = generateToken();
-    addAdminMutation.mutate({ name: inviteName, email: inviteEmail, invited: true, inviteToken: token });
-    setInviteEmail(''); setInviteName('');
-    const link = `${window.location.origin}/accept-invite?token=${token}`;
-  toast('Convite enviado', { description: link, action: { label: 'Copiar', onClick: () => navigator.clipboard.writeText(link) } } as any);
+
+    // Try to call a local dev invite server (uses service role key) at localhost:3002
+    // If not available, fall back to the existing behavior (store invite and copy link)
+    try {
+      const resp = await fetch('http://localhost:3002/send-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: inviteName, email: inviteEmail, token }),
+      });
+      if (resp.ok) {
+        const json = await resp.json();
+        const link = json.link || `${window.location.origin}/accept-invite?token=${token}`;
+        // Invalidate and let fetchAdmins pick up new row
+        queryClient.invalidateQueries({ queryKey: ['admins'] });
+        setInviteEmail(''); setInviteName('');
+        
+        // Show appropriate message based on whether email was sent
+        const mailSent = json.mailResult?.sent;
+        const mailSkipped = json.mailResult?.skipped;
+        if (mailSent) {
+          return toast({ title: '✅ Convite enviado por email', description: `Email enviado para ${inviteEmail}. Link: ${link}`, action: { label: 'Copiar', onClick: () => navigator.clipboard.writeText(link) } } as any);
+        } else if (mailSkipped) {
+          return toast({ title: 'Convite criado', description: `SMTP não configurado. Usuário criado. Link: ${link}`, action: { label: 'Copiar', onClick: () => navigator.clipboard.writeText(link) } } as any);
+        } else {
+          return toast({ title: 'Convite criado', description: link, action: { label: 'Copiar', onClick: () => navigator.clipboard.writeText(link) } } as any);
+        }
+      } else {
+        const errorJson = await resp.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Invite server error:', errorJson);
+        throw new Error(errorJson.error?.message || errorJson.error || 'Servidor retornou erro');
+      }
+    } catch (err: any) {
+      console.warn('Invite server not available or error:', err);
+      // Fall back to local storage
+    }
+
+    // Fallback: create the admin invite row locally (existing behavior)
+    addAdminMutation.mutate({ name: inviteName, email: inviteEmail, invited: true, inviteToken: token }, {
+      onSuccess: () => {
+        const link = `${window.location.origin}/accept-invite?token=${token}`;
+        setInviteEmail(''); setInviteName('');
+        toast({ title: 'Convite armazenado', description: 'Servidor de envio não disponível. Convite salvo localmente.', action: { label: 'Copiar link', onClick: () => navigator.clipboard.writeText(link) } } as any);
+      },
+      onError: (e: any) => {
+        toast({ title: 'Erro', description: e?.message || 'Falha ao criar convite', variant: 'destructive' } as any);
+      }
+    });
   };
 
   const activateAdmin = (a: Admin) => {
