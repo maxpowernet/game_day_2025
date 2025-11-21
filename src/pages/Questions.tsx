@@ -39,6 +39,7 @@ import {
   Trophy,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -291,6 +292,7 @@ const Questions = () => {
       <Sidebar />
 
       <main className='flex-1 overflow-auto'>
+        <ErrorBoundary>
         <header className='bg-card border-b border-border p-4 md:p-6'>
           <div className='flex items-center justify-between'>
             <div className='flex-1 max-w-md'>
@@ -477,6 +479,7 @@ const Questions = () => {
             </div>
           </Card>
         </div>
+        </ErrorBoundary>
       </main>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
