@@ -202,14 +202,18 @@ const Calendar = () => {
 
     // Empty cells for days before the first day of the month
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-16 sm:h-20 md:h-24 bg-muted/30 rounded-lg" />);
+      days.push(<div key={`empty-${i}`} className="h-24 bg-muted/20 rounded-lg" />);
     }
 
     // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const dayEvents = getEventsForDay(day);
       const isToday = day === todayInBrasilia.day && currentDate.getMonth() === todayInBrasilia.month && currentDate.getFullYear() === todayInBrasilia.year;
-      const outerClass = `h-16 sm:h-20 md:h-24 bg-card rounded-lg p-1 sm:p-2 cursor-pointer hover:bg-accent/50 transition-colors ${isToday ? 'border-2 border-primary' : 'border border-border'}`;
+      const outerClass = `h-24 bg-card rounded-lg p-2 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${
+        isToday 
+          ? 'ring-2 ring-primary bg-gradient-to-br from-primary/10 to-accent/10' 
+          : 'border border-border hover:border-primary/50'
+      }`;
 
       days.push(
         <div
@@ -217,29 +221,41 @@ const Calendar = () => {
           onClick={() => handleDayClick(day)}
           className={outerClass}
         >
-          <div className="text-sm font-semibold mb-1">{day}</div>
-          <div className="flex flex-col gap-1">
-            {dayEvents.map(event => {
+          <div className={`text-sm font-bold mb-1 ${isToday ? 'text-primary' : ''}`}>
+            {day}
+          </div>
+          <div className="flex flex-col gap-1 overflow-hidden">
+            {dayEvents.slice(0, 2).map(event => {
               const IconComponent = iconOptions.find(opt => opt.value === event.icon)?.icon || Star;
               return (
                 <div
                   key={event.id}
-                  className={`${event.color} rounded px-2 py-1 text-white flex items-center gap-1.5 text-xs font-medium`}
+                  className={`${event.color} rounded px-1.5 py-0.5 text-white flex items-center gap-1 text-xs font-medium shadow-sm`}
                   title={event.name}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button onClick={() => toggleEventCompleted(event.id)} className="flex items-center justify-center">
                     <IconComponent className={`h-3 w-3 flex-shrink-0 ${event.completed ? 'opacity-60' : ''}`} />
                   </button>
-                  <span className={`truncate ${event.completed ? 'line-through opacity-60' : ''}`}>{event.name}</span>
+                  <span className={`truncate flex-1 ${event.completed ? 'line-through opacity-60' : ''}`}>
+                    {event.name}
+                  </span>
                   {!event.isCampaign && (
-                    <button onClick={(e) => { e.stopPropagation(); deleteEvent(event.id); }} className="ml-auto">
-                      <Trash2 className="h-4 w-4" />
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deleteEvent(event.id); }} 
+                      className="opacity-0 group-hover:opacity-100 hover:bg-white/20 rounded p-0.5 transition-all"
+                    >
+                      <Trash2 className="h-3 w-3" />
                     </button>
                   )}
                 </div>
               );
             })}
+            {dayEvents.length > 2 && (
+              <div className="text-xs text-muted-foreground text-center bg-muted/30 rounded py-0.5">
+                +{dayEvents.length - 2} mais
+              </div>
+            )}
           </div>
         </div>
       );
@@ -283,39 +299,118 @@ const Calendar = () => {
         <div className="p-4 md:p-6">
           <div className="mb-6">
             <h1 className="text-3xl font-bold mb-1">Calendário</h1>
-            <p className="text-muted-foreground">Gerencie seus eventos e compromissos</p>
+            <p className="text-muted-foreground">Gerencie seus eventos e acompanhe suas campanhas</p>
           </div>
 
-          <Card className="p-6">
-            {/* Calendar Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">
-                {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-              </h2>
-              <div className="flex gap-2">
-                <Button variant="outline" size="icon" onClick={previousMonth}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="icon" onClick={nextMonth}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Day names */}
-            <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-3 mb-2">
-              {dayNames.map(day => (
-                <div key={day} className="text-center text-sm font-semibold text-muted-foreground p-1 sm:p-2">
-                  {day}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Calendar - 2/3 width */}
+            <div className="lg:col-span-2">
+              <Card className="p-6 shadow-lg">
+                {/* Calendar Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                    {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+                  </h2>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="icon" onClick={previousMonth} className="hover:bg-primary hover:text-white transition-colors">
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={nextMonth} className="hover:bg-primary hover:text-white transition-colors">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              ))}
+
+                {/* Day names */}
+                <div className="grid grid-cols-7 gap-2 mb-3">
+                  {dayNames.map(day => (
+                    <div key={day} className="text-center text-sm font-bold text-primary p-2 bg-primary/5 rounded-md">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar grid */}
+                <div className="grid grid-cols-7 gap-2">
+                  {renderCalendar()}
+                </div>
+              </Card>
             </div>
 
-            {/* Calendar grid */}
-            <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-3">
-              {renderCalendar()}
+            {/* Campaigns List - 1/3 width */}
+            <div className="lg:col-span-1">
+              <Card className="p-6 shadow-lg h-full">
+                <div className="flex items-center gap-2 mb-4">
+                  <Flag className="h-5 w-5 text-primary" />
+                  <h3 className="text-xl font-bold">Campanhas Ativas</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {campaigns.length} {campaigns.length === 1 ? 'campanha' : 'campanhas'} cadastrada{campaigns.length !== 1 ? 's' : ''}
+                </p>
+
+                <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2">
+                  {campaigns.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Flag className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                      <p>Nenhuma campanha cadastrada</p>
+                    </div>
+                  ) : (
+                    campaigns.map((campaign: any) => {
+                      const startDate = new Date(campaign.startDate);
+                      const endDate = new Date(campaign.endDate);
+                      const playerCount = campaign.playerIds?.length || 0;
+                      
+                      const statusColors = {
+                        'planned': 'bg-purple-500/10 text-purple-700 border-purple-200',
+                        'in-progress': 'bg-blue-500/10 text-blue-700 border-blue-200',
+                        'completed': 'bg-green-500/10 text-green-700 border-green-200'
+                      };
+                      
+                      const statusLabels = {
+                        'planned': 'Planejada',
+                        'in-progress': 'Em Andamento',
+                        'completed': 'Concluída'
+                      };
+
+                      return (
+                        <Card key={campaign.id} className="p-4 border-2 hover:shadow-md transition-shadow cursor-pointer">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+                              {campaign.icon || '🎯'}
+                            </div>
+                            
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-sm mb-1 truncate" title={campaign.name}>
+                                {campaign.name}
+                              </h4>
+                              
+                              <Badge className={`${statusColors[campaign.status as keyof typeof statusColors]} mb-2 text-xs`}>
+                                {statusLabels[campaign.status as keyof typeof statusLabels]}
+                              </Badge>
+                              
+                              <div className="space-y-1.5 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-2">
+                                  <Users className="h-3.5 w-3.5 text-primary" />
+                                  <span className="font-medium">{playerCount} {playerCount === 1 ? 'jogador' : 'jogadores'}</span>
+                                </div>
+                                
+                                <div className="flex items-center gap-2">
+                                  <CalendarIcon className="h-3.5 w-3.5 text-primary" />
+                                  <span>{startDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>
+                                  <span className="text-muted-foreground/60">→</span>
+                                  <span>{endDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })
+                  )}
+                </div>
+              </Card>
             </div>
-          </Card>
+          </div>
 
           {/* Event Dialog */}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
