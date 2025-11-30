@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchCampaigns } from "@/lib/storageApi";
+import { fetchCampaigns, fetchQuestions } from "@/lib/storageApi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -74,6 +74,7 @@ const Calendar = () => {
   const [selectedIcon, setSelectedIcon] = useState("star");
 
   const { data: campaigns = [] } = useQuery({ queryKey: ['campaigns'], queryFn: fetchCampaigns });
+  const { data: questions = [] } = useQuery({ queryKey: ['questions'], queryFn: fetchQuestions });
 
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -372,33 +373,38 @@ const Calendar = () => {
                         'completed': 'Concluída'
                       };
 
+                      const questionCount = questions.filter((q: any) => q.campaignId === campaign.id).length;
+                      
                       return (
-                        <Card key={campaign.id} className="p-4 border-2 hover:shadow-md transition-shadow cursor-pointer">
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+                        <Card key={campaign.id} className="p-3 border-2 hover:shadow-md transition-shadow cursor-pointer">
+                          <div className="flex items-start gap-2">
+                            <div className="w-9 h-9 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center text-xl flex-shrink-0">
                               {campaign.icon || '🎯'}
                             </div>
                             
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-sm mb-1 truncate" title={campaign.name}>
+                              <h4 className="font-semibold text-xs mb-1 truncate" title={campaign.name}>
                                 {campaign.name}
                               </h4>
                               
-                              <Badge className={`${statusColors[campaign.status as keyof typeof statusColors]} mb-2 text-xs`}>
+                              <Badge className={`${statusColors[campaign.status as keyof typeof statusColors]} mb-2 text-[10px] px-1.5 py-0`}>
                                 {statusLabels[campaign.status as keyof typeof statusLabels]}
                               </Badge>
                               
-                              <div className="space-y-1.5 text-xs text-muted-foreground">
-                                <div className="flex items-center gap-2">
-                                  <Users className="h-3.5 w-3.5 text-primary" />
-                                  <span className="font-medium">{playerCount} {playerCount === 1 ? 'jogador' : 'jogadores'}</span>
+                              <div className="space-y-1 text-[11px] text-muted-foreground">
+                                <div className="flex items-center gap-1.5">
+                                  <Users className="h-3 w-3 text-primary" />
+                                  <span className="font-medium">{playerCount}</span>
                                 </div>
                                 
-                                <div className="flex items-center gap-2">
-                                  <CalendarIcon className="h-3.5 w-3.5 text-primary" />
-                                  <span>{startDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>
-                                  <span className="text-muted-foreground/60">→</span>
-                                  <span>{endDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <HelpCircle className="h-3 w-3 text-primary" />
+                                  <span className="font-medium">{questionCount} {questionCount === 1 ? 'pergunta' : 'perguntas'}</span>
+                                </div>
+                                
+                                <div className="flex items-center gap-1.5">
+                                  <CalendarIcon className="h-3 w-3 text-primary" />
+                                  <span className="text-[10px]">{startDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} → {endDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>
                                 </div>
                               </div>
                             </div>
