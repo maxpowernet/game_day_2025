@@ -44,10 +44,6 @@ const Sidebar: React.FC = () => {
           <HelpCircle className="h-4 w-4" />
           Perguntas
         </Button>
-        <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/teams')}>
-          <Users className="h-4 w-4" />
-          Equipes
-        </Button>
         <Button variant="ghost" className="w-full justify-start gap-3" onClick={() => navigate('/players')}>
           <Users className="h-4 w-4" />
           Jogadores

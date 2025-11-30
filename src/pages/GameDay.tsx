@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchCampaigns, fetchQuestions, fetchPlayers, fetchTeams } from "@/lib/storageApi";
+import { fetchCampaigns, fetchQuestions, fetchPlayers } from "@/lib/storageApi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
@@ -27,13 +27,11 @@ const GameDay = () => {
   const { data: campaigns = [] } = useQuery({ queryKey: ['campaigns'], queryFn: fetchCampaigns });
   const { data: questions = [] } = useQuery({ queryKey: ['questions'], queryFn: fetchQuestions });
   const { data: players = [] } = useQuery({ queryKey: ['players'], queryFn: fetchPlayers });
-  const { data: teams = [] } = useQuery({ queryKey: ['teams'], queryFn: fetchTeams });
 
   const stats = {
     activeCampaigns: campaigns.filter((c: any) => c.status === 'in-progress').length,
     pendingQuestions: questions.filter((q: any) => q.status === 'todo').length,
     totalPlayers: players.length,
-    totalTeams: teams.length,
   };
 
   const formatTime = (seconds: number) => {
@@ -101,12 +99,6 @@ const GameDay = () => {
               change="Cadastrados"
               changeType="increase"
               icon={Play}
-            />
-            <StatCard
-              title="Total de Equipes"
-              value={stats.totalTeams.toString()}
-              change="Formadas"
-              icon={ArrowUpRight}
             />
           </div>
 

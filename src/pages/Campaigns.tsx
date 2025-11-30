@@ -109,8 +109,7 @@ const Campaigns = () => {
       status: form.status, 
       playerIds: form.playerIds,
       createdAt: new Date().toISOString(), 
-      questionIds: [], 
-      teamIds: [] 
+      questionIds: []
     };
     if (editing) updateMutation.mutate({ ...editing, ...payload }); else addMutation.mutate(payload);
     setIsDialogOpen(false);

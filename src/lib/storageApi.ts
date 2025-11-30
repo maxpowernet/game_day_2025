@@ -8,18 +8,8 @@ export interface Player {
   status?: string;
   score: number; // total across all campaigns
   gameCoins?: number; // coins earned (1 point = 1 gamecoin)
-  teamId?: number;
   campaignScores?: { [campaignId: number]: number }; // points per campaign
   authUid?: string;
-}
-
-export interface Team {
-  id: number;
-  campaignId: number; // team belongs to a specific campaign
-  name: string;
-  members: number[]; // player IDs
-  totalScore?: number; // calculated sum of member scores in this campaign
-  createdAt: string;
 }
 
 export interface Campaign {
@@ -31,7 +21,6 @@ export interface Campaign {
   icon?: string;
   playerIds: number[]; // players enrolled in this campaign
   questionIds?: number[]; // associated questions (optional, can be derived)
-  teamIds?: number[]; // associated teams (optional, can be derived)
   createdAt: string;
 }
 
@@ -111,7 +100,6 @@ export async function fetchPlayers(): Promise<Player[]> {
     status: p.status,
     score: p.score || 0,
     gameCoins: p.game_coins || 0,
-    teamId: p.team_id,
     authUid: p.auth_uid,
   }));
 }
@@ -126,7 +114,6 @@ export async function setPlayers(players: Player[]): Promise<Player[]> {
     status: p.status,
     score: p.score || 0,
     game_coins: p.gameCoins || 0,
-    team_id: p.teamId,
     auth_uid: p.authUid,
   }));
 
@@ -155,7 +142,6 @@ export async function addPlayer(p: Omit<Player, 'id'>): Promise<Player> {
       status: p.status,
       score: p.score || 0,
       game_coins: p.gameCoins || 0,
-      team_id: p.teamId,
       auth_uid: authUid,
     })
     .select()
@@ -174,7 +160,6 @@ export async function addPlayer(p: Omit<Player, 'id'>): Promise<Player> {
     status: data.status,
     score: data.score || 0,
     gameCoins: data.game_coins || 0,
-    teamId: data.team_id,
     authUid: data.auth_uid,
   };
 }
@@ -189,7 +174,6 @@ export async function updatePlayer(updated: Player): Promise<Player> {
       status: updated.status,
       score: updated.score || 0,
       game_coins: updated.gameCoins || 0,
-      team_id: updated.teamId,
       auth_uid: updated.authUid,
     })
     .eq('id', updated.id)
@@ -209,7 +193,6 @@ export async function updatePlayer(updated: Player): Promise<Player> {
     status: data.status,
     score: data.score || 0,
     gameCoins: data.game_coins || 0,
-    teamId: data.team_id,
     authUid: data.auth_uid,
   };
 }
@@ -221,7 +204,6 @@ export async function deletePlayer(id: number): Promise<void> {
     await supabase.from('purchases').delete().eq('player_id', id);
     await supabase.from('player_campaign_scores').delete().eq('player_id', id);
     await supabase.from('campaign_players').delete().eq('player_id', id);
-    await supabase.from('team_members').delete().eq('player_id', id);
     
     // Delete the player
     const { error } = await supabase.from('players').delete().eq('id', id);
@@ -557,137 +539,6 @@ export async function deleteQuestion(id: number): Promise<void> {
     throw error;
   }
 }
-
-// ============================================================================
-// TEAMS - Supabase CRUD
-// ============================================================================
-
-export async function fetchTeams(): Promise<Team[]> {
-  const { data, error } = await supabase
-    .from('teams')
-    .select('*, team_members(player_id)')
-    .order('id', { ascending: true });
-  
-  if (error) {
-    console.error('Error fetching teams:', error);
-    return [];
-  }
-  
-  return (data || []).map(t => ({
-    id: t.id,
-    campaignId: t.campaign_id,
-    name: t.name,
-    members: (t.team_members || []).map((tm: any) => tm.player_id),
-    totalScore: t.total_score,
-    createdAt: t.created_at,
-  }));
-}
-
-export async function setTeams(teams: Team[]): Promise<Team[]> {
-  const records = teams.map(t => ({
-    id: t.id,
-    campaign_id: t.campaignId,
-    name: t.name,
-    total_score: t.totalScore,
-  }));
-  
-  const { error } = await supabase.from('teams').upsert(records);
-  if (error) console.error('Error setting teams:', error);
-  
-  return fetchTeams();
-}
-
-export async function addTeam(t: Omit<Team, 'id'>): Promise<Team> {
-  const { data, error } = await supabase
-    .from('teams')
-    .insert({
-      campaign_id: t.campaignId,
-      name: t.name,
-      total_score: t.totalScore || 0,
-    })
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('Error adding team:', error);
-    throw new Error(error.message);
-  }
-  
-  // Insert team_members relationships
-  if (t.members && t.members.length > 0) {
-    const memberships = t.members.map(playerId => ({
-      team_id: data.id,
-      player_id: playerId,
-    }));
-    await supabase.from('team_members').insert(memberships);
-  }
-  
-  return {
-    id: data.id,
-    campaignId: data.campaign_id,
-    name: data.name,
-    members: t.members || [],
-    totalScore: data.total_score,
-    createdAt: data.created_at,
-  };
-}
-
-export async function updateTeam(updated: Team): Promise<Team> {
-  const { data, error } = await supabase
-    .from('teams')
-    .update({
-      campaign_id: updated.campaignId,
-      name: updated.name,
-      total_score: updated.totalScore || 0,
-    })
-    .eq('id', updated.id)
-    .select()
-    .single();
-  
-  if (error) {
-    console.error('Error updating team:', error);
-    throw new Error(error.message);
-  }
-  
-  // Update team_members relationships
-  await supabase.from('team_members').delete().eq('team_id', updated.id);
-  
-  if (updated.members && updated.members.length > 0) {
-    const memberships = updated.members.map(playerId => ({
-      team_id: updated.id,
-      player_id: playerId,
-    }));
-    await supabase.from('team_members').insert(memberships);
-  }
-  
-  return {
-    id: data.id,
-    campaignId: data.campaign_id,
-    name: data.name,
-    members: updated.members || [],
-    totalScore: data.total_score,
-    createdAt: data.created_at,
-  };
-}
-
-export async function deleteTeam(id: number): Promise<void> {
-  try {
-    // Delete team members first
-    await supabase.from('team_members').delete().eq('team_id', id);
-    
-    // Delete the team
-    const { error } = await supabase.from('teams').delete().eq('id', id);
-    if (error) {
-      console.error('Error deleting team:', error);
-      throw new Error(error.message);
-    }
-  } catch (error: any) {
-    console.error('Error in deleteTeam:', error);
-    throw error;
-  }
-}
-
-
 
 // ============================================================================
 // PRODUCTS - Supabase CRUD

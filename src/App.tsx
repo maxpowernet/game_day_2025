@@ -10,7 +10,6 @@ import Calendar from "./pages/Calendar";
 import Players from "./pages/Players";
 import Campaigns from "./pages/Campaigns";
 import Questions from "./pages/Questions";
-import Teams from "./pages/Teams";
 import Settings from "./pages/Settings";
 import AcceptInvite from "./pages/AcceptInvite";
 import Store from "./pages/Store";
@@ -48,7 +47,6 @@ const App = () => (
             <Route path="/questions" element={<Questions />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/players" element={<Players />} />
-            <Route path="/teams" element={<Teams />} />
             <Route path="/lojinha" element={<Store />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/accept-invite" element={<AcceptInvite />} />

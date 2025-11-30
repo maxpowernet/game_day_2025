@@ -23,11 +23,9 @@ DROP TABLE IF EXISTS answers CASCADE;
 DROP TABLE IF EXISTS purchases CASCADE;
 DROP TABLE IF EXISTS player_campaign_scores CASCADE;
 DROP TABLE IF EXISTS campaign_players CASCADE;
-DROP TABLE IF EXISTS team_members CASCADE;
 DROP TABLE IF EXISTS questions CASCADE;
 DROP TABLE IF EXISTS products CASCADE;
 DROP TABLE IF EXISTS players CASCADE;
-DROP TABLE IF EXISTS teams CASCADE;
 DROP TABLE IF EXISTS campaigns CASCADE;
 DROP TABLE IF EXISTS admins CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
@@ -61,25 +59,6 @@ CREATE TABLE players (
   game_coins BIGINT NOT NULL DEFAULT 0,
   auth_uid TEXT -- stores the Supabase auth uid (string)
 );
-
--- Note: teams referenced above; to avoid forward-reference issues we create teams table next and alter players afterwards.
-
--- =====================================================
--- Table: teams
--- =====================================================
-CREATE TABLE teams (
-    id SERIAL PRIMARY KEY,
-    campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    total_score BIGINT DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-);
-
--- Now alter players to add FK properly (if not created earlier)
-ALTER TABLE players
-    ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL;
-
-CREATE INDEX idx_teams_campaign_id ON teams(campaign_id);
 
 -- =====================================================
 -- Table: campaign_players (many-to-many)
@@ -199,18 +178,6 @@ CREATE TABLE messages (
     received_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     handled BOOLEAN DEFAULT FALSE
 );
-
--- =====================================================
--- Table: team_members (many-to-many between teams and players)
--- =====================================================
-CREATE TABLE team_members (
-    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-    player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-    assigned_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    PRIMARY KEY (team_id, player_id)
-);
-
-CREATE INDEX idx_team_members_player ON team_members(player_id);
 
 -- =====================================================
 -- Table: player_campaign_scores (store campaignScores map)
@@ -429,9 +396,7 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE campaign_players ENABLE ROW LEVEL SECURITY;
-ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
 
 -- PLAYERS policies
@@ -457,13 +422,6 @@ CREATE POLICY admins_full_access_campaigns ON campaigns
 -- QUESTIONS policies
 DROP POLICY IF EXISTS admins_full_access_questions ON questions;
 CREATE POLICY admins_full_access_questions ON questions
-  FOR ALL
-  USING (auth.uid() IS NOT NULL)
-  WITH CHECK (auth.uid() IS NOT NULL);
-
--- TEAMS policies
-DROP POLICY IF EXISTS admins_full_access_teams ON teams;
-CREATE POLICY admins_full_access_teams ON teams
   FOR ALL
   USING (auth.uid() IS NOT NULL)
   WITH CHECK (auth.uid() IS NOT NULL);
@@ -531,13 +489,6 @@ CREATE POLICY player_see_own_score ON player_campaign_scores
 -- CAMPAIGN_PLAYERS policies
 DROP POLICY IF EXISTS admins_full_access_campaign_players ON campaign_players;
 CREATE POLICY admins_full_access_campaign_players ON campaign_players
-  FOR ALL
-  USING (auth.uid() IS NOT NULL)
-  WITH CHECK (auth.uid() IS NOT NULL);
-
--- TEAM_MEMBERS policies
-DROP POLICY IF EXISTS admins_full_access_team_members ON team_members;
-CREATE POLICY admins_full_access_team_members ON team_members
   FOR ALL
   USING (auth.uid() IS NOT NULL)
   WITH CHECK (auth.uid() IS NOT NULL);
