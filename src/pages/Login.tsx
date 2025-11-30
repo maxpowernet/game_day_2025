@@ -40,7 +40,8 @@ const Login = () => {
         title: "Login realizado com sucesso!",
         description: "Redirecionando...",
       });
-      navigate("/game-day");
+      // O redirecionamento será automático via LoginRoute no App.tsx
+      // não precisa de navigate() aqui
     }
   };
 
