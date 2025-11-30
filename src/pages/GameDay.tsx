@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchCampaigns, fetchQuestions, fetchPlayers } from "@/lib/storageApi";
@@ -13,7 +12,8 @@ import {
   CheckSquare,
   Calendar,
   Users,
-  HelpCircle
+  HelpCircle,
+  Play
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
@@ -76,30 +76,6 @@ const GameDay = () => {
       default: return status;
     }
   };
-
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
-  const projects = [
-    { id: 1, name: "Desenvolver Endpoints da API", dueDate: "26 de nov, 2024", icon: "🎮", color: "bg-blue-500" },
-    { id: 2, name: "Fluxo de Integração", dueDate: "28 de nov, 2024", icon: "🕹️", color: "bg-cyan-500" },
-    { id: 3, name: "Construir Game Day", dueDate: "30 de nov, 2024", icon: "🎲", color: "bg-green-500" },
-    { id: 4, name: "Otimizar Carregamento de Página", dueDate: "4 de dez, 2024", icon: "🏆", color: "bg-yellow-500" },
-  ];
-
-  const teamMembers = [
-    { name: "Alexandra Deff", task: "Repositório do Projeto no GitHub", status: "Concluído", badge: "success" },
-    { name: "Edwin Adenike", task: "Integrar Sistema de Autenticação de Usuário", status: "Em Andamento", badge: "warning" },
-    { name: "Isaac Oluwatemilorun", task: "Desenvolver Funcionalidade de Busca e Filtro", status: "Pendente", badge: "destructive" },
-    { name: "David Oshodi", task: "Layout Responsivo para Página Inicial", status: "Em Andamento", badge: "warning" },
-  ];
-
-  const chartDays = ["M", "T", "W", "T", "F", "S", "S"];
-  const chartValues = [60, 85, 45, 95, 50, 70, 65];
 
   return (
     <div className="flex min-h-screen bg-background">
