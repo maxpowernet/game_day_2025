@@ -5,24 +5,21 @@ import { fetchCampaigns, fetchQuestions, fetchPlayers } from "@/lib/storageApi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import UserProfile from '@/components/UserProfile';
 import { Badge } from "@/components/ui/badge";
 import { 
-  Play,
-  Pause,
-  Square,
   Plus,
   TrendingUp,
-  ArrowUpRight,
-  CheckSquare
+  CheckSquare,
+  Calendar,
+  Users,
+  HelpCircle
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const GameDay = () => {
   const navigate = useNavigate();
-  const [activeTimer, setActiveTimer] = useState(false);
-  const [timerSeconds, setTimerSeconds] = useState(5048);
 
   const { data: campaigns = [] } = useQuery({ queryKey: ['campaigns'], queryFn: fetchCampaigns });
   const { data: questions = [] } = useQuery({ queryKey: ['questions'], queryFn: fetchQuestions });
@@ -32,6 +29,52 @@ const GameDay = () => {
     activeCampaigns: campaigns.filter((c: any) => c.status === 'in-progress').length,
     pendingQuestions: questions.filter((q: any) => q.status === 'todo').length,
     totalPlayers: players.length,
+  };
+
+  // Prepare pie chart data for campaign status
+  const campaignStatusData = [
+    { 
+      name: 'Em Progresso', 
+      value: campaigns.filter((c: any) => c.status === 'in-progress').length,
+      color: '#3b82f6' // blue
+    },
+    { 
+      name: 'Planejando', 
+      value: campaigns.filter((c: any) => c.status === 'planning').length,
+      color: '#eab308' // yellow
+    },
+    { 
+      name: 'Concluída', 
+      value: campaigns.filter((c: any) => c.status === 'completed').length,
+      color: '#22c55e' // green
+    },
+    { 
+      name: 'Cancelada', 
+      value: campaigns.filter((c: any) => c.status === 'cancelled').length,
+      color: '#ef4444' // red
+    },
+  ].filter(item => item.value > 0);
+
+  // Get status badge variant
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'in-progress': return 'default';
+      case 'planning': return 'secondary';
+      case 'completed': return 'success';
+      case 'cancelled': return 'destructive';
+      default: return 'outline';
+    }
+  };
+
+  // Get status label
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'in-progress': return 'Em Progresso';
+      case 'planning': return 'Planejando';
+      case 'completed': return 'Concluída';
+      case 'cancelled': return 'Cancelada';
+      default: return status;
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -104,170 +147,92 @@ const GameDay = () => {
 
           {/* Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Project Analytics */}
-            <Card className="lg:col-span-2 p-6">
+            {/* Campaign Status Pie Chart */}
+            <Card className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold">Análise de Projetos</h3>
+                <h3 className="text-lg font-semibold">Status das Campanhas</h3>
               </div>
-              <div className="flex items-end justify-between h-48 gap-2">
-                {chartValues.map((value, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                    <div className="w-full bg-muted rounded-t-lg relative" style={{ height: '100%' }}>
-                      <div 
-                        className="absolute bottom-0 w-full bg-gradient-to-t from-primary to-accent rounded-t-lg transition-all"
-                        style={{ height: `${value}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground">{chartDays[i]}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Reminders */}
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Lembretes</h3>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium mb-1">Reunião com Arc Company</h4>
-                  <p className="text-sm text-muted-foreground mb-3">Horário: 14:00 - 16:00</p>
-                  <Button className="w-full" size="sm">
-                    <Play className="h-4 w-4 mr-2" />
-                    Iniciar Reunião
-                  </Button>
+              {campaignStatusData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={campaignStatusData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {campaignStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[250px] text-muted-foreground">
+                  Nenhuma campanha cadastrada
                 </div>
-              </div>
+              )}
             </Card>
 
-            {/* Team Collaboration */}
-            <Card className="lg:col-span-2 p-6">
+            {/* Campaigns List */}
+            <Card className="lg:col-span-2 p-6 max-h-[400px] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Colaboração da Equipe</h3>
-                <Button variant="outline" size="sm">
+                <h3 className="text-lg font-semibold">Campanhas</h3>
+                <Button variant="outline" size="sm" onClick={() => navigate('/campaigns')}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Adicionar Membro
+                  Nova Campanha
                 </Button>
               </div>
               <div className="space-y-3">
-                {teamMembers.map((member, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <Avatar>
-                      <AvatarFallback className="bg-primary text-white">
-                        {member.name.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{member.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{member.task}</p>
+                {campaigns.length > 0 ? (
+                  campaigns.map((campaign: any) => (
+                    <div 
+                      key={campaign.id} 
+                      className="p-4 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors cursor-pointer"
+                      onClick={() => navigate('/campaigns')}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-base mb-1">{campaign.name}</h4>
+                          {campaign.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                              {campaign.description}
+                            </p>
+                          )}
+                        </div>
+                        <Badge variant={getStatusVariant(campaign.status) as any} className="ml-2">
+                          {getStatusLabel(campaign.status)}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          <span>
+                            {campaign.start_date ? new Date(campaign.start_date).toLocaleDateString('pt-BR') : 'N/A'}
+                            {campaign.end_date && ` - ${new Date(campaign.end_date).toLocaleDateString('pt-BR')}`}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Users className="h-4 w-4" />
+                          <span>{campaign.player_count || 0} jogadores</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <HelpCircle className="h-4 w-4" />
+                          <span>{campaign.question_count || 0} perguntas</span>
+                        </div>
+                      </div>
                     </div>
-                    <Badge variant={member.badge as any}>{member.status}</Badge>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhuma campanha cadastrada. Clique em "Nova Campanha" para começar.
                   </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Projects List */}
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Projeto</h3>
-                <Button variant="ghost" size="sm">
-                  <Plus className="h-4 w-4" />
-                  Novo
-                </Button>
-              </div>
-              <div className="space-y-3">
-                {projects.map((project) => (
-                  <div key={project.id} className="flex items-center gap-3">
-                    <div className={`h-10 w-10 ${project.color} rounded-lg flex items-center justify-center text-lg`}>
-                      {project.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{project.name}</p>
-                      <p className="text-xs text-muted-foreground">Data de entrega: {project.dueDate}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Project Progress */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Progresso dos Projetos</h3>
-              <div className="flex items-center justify-center">
-                <div className="relative w-40 h-40">
-                  <svg className="w-full h-full" viewBox="0 0 100 100">
-                    <circle
-                      className="text-muted stroke-current"
-                      strokeWidth="8"
-                      fill="transparent"
-                      r="40"
-                      cx="50"
-                      cy="50"
-                    />
-                    <circle
-                      className="text-primary stroke-current"
-                      strokeWidth="8"
-                      strokeLinecap="round"
-                      fill="transparent"
-                      r="40"
-                      cx="50"
-                      cy="50"
-                      strokeDasharray={`${41 * 2 * Math.PI}`}
-                      strokeDashoffset={`${41 * 2 * Math.PI * (1 - 0.41)}`}
-                      transform="rotate(-90 50 50)"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-bold">41%</span>
-                    <span className="text-xs text-muted-foreground">Projetos Finalizados</span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-6 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-primary" />
-                    <span>Concluído</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-accent" />
-                    <span>Em Andamento</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-muted" />
-                    <span>Pendente</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Time Tracker */}
-            <Card className="p-6 bg-gradient-to-br from-primary to-accent text-white">
-              <h3 className="text-lg font-semibold mb-4">Rastreador de Tempo</h3>
-              <div className="flex items-center justify-center mb-6">
-                <div className="text-5xl font-bold font-mono">
-                  {formatTime(timerSeconds)}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  variant="secondary" 
-                  className="flex-1"
-                  onClick={() => setActiveTimer(!activeTimer)}
-                >
-                  {activeTimer ? <Pause className="h-4 w-4 mr-2" /> : <Play className="h-4 w-4 mr-2" />}
-                  {activeTimer ? "Pausar" : "Iniciar"}
-                </Button>
-                <Button variant="secondary" className="flex-1">
-                  <Square className="h-4 w-4 mr-2" />
-                  Parar
-                </Button>
+                )}
               </div>
             </Card>
           </div>

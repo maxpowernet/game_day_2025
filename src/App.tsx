@@ -2,8 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./lib/auth";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./lib/auth";
 import Login from "./pages/Login";
 import GameDay from "./pages/GameDay";
 import Calendar from "./pages/Calendar";
@@ -33,6 +33,25 @@ const queryClient = new QueryClient({
   },
 });
 
+// Protected Route Component
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -42,14 +61,14 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Login />} />
-            <Route path="/game-day" element={<GameDay />} />
-            <Route path="/campaigns" element={<Campaigns />} />
-            <Route path="/questions" element={<Questions />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/players" element={<Players />} />
-            <Route path="/lojinha" element={<Store />} />
-            <Route path="/settings" element={<Settings />} />
             <Route path="/accept-invite" element={<AcceptInvite />} />
+            <Route path="/game-day" element={<ProtectedRoute><GameDay /></ProtectedRoute>} />
+            <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
+            <Route path="/questions" element={<ProtectedRoute><Questions /></ProtectedRoute>} />
+            <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
+            <Route path="/players" element={<ProtectedRoute><Players /></ProtectedRoute>} />
+            <Route path="/lojinha" element={<ProtectedRoute><Store /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             {/* /tasks and /scoreboard routes removed */}
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

@@ -17,9 +17,30 @@ import {
   Play,
   ShoppingBag,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Logout realizado",
+        description: "Você saiu do sistema com sucesso.",
+      });
+      navigate('/');
+    } catch (error) {
+      toast({
+        title: "Erro ao sair",
+        description: "Não foi possível fazer logout. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <aside className="w-64 bg-card border-r border-border p-6 hidden md:block">
@@ -65,7 +86,7 @@ const Sidebar: React.FC = () => {
           Configurações
         </Button>
         {/* Ajuda removed */}
-        <Button variant="ghost" className="w-full justify-start gap-3">
+        <Button variant="ghost" className="w-full justify-start gap-3" onClick={handleLogout}>
           <LogOut className="h-4 w-4" />
           Sair
         </Button>
